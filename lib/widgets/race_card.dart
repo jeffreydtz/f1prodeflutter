@@ -32,9 +32,12 @@ class RaceCard extends StatelessWidget {
         trailing: ElevatedButton(
           onPressed: onBetPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
+            backgroundColor: const Color.fromARGB(255, 255, 20, 3),
           ),
-          child: const Text('Apostar'),
+          child: const Text(
+            'Apostar',
+            style: TextStyle(color: Colors.white),
+          ),
         ),
       ),
     );

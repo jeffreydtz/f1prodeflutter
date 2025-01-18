@@ -13,13 +13,9 @@ class _BetScreenState extends State<BetScreen> {
   final ApiService apiService = ApiService();
 
   String _selectedPoleman = '';
-  // Para top 10, aquí podrías usar un arreglo de 10 pilotos
   List<String> _top10 = List.filled(10, '');
-  // Para DNF, podrías usar checks
-  List<String> _dnfs = [];
-
+  String _selectedDnf = '';
   bool _isLoading = false;
-  String? _message;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +70,9 @@ class _BetScreenState extends State<BetScreen> {
                   dropdownColor: Colors.grey[900],
                   style: const TextStyle(color: Colors.white),
                   value: _top10[index].isNotEmpty ? _top10[index] : null,
-                  items: _pilotos.map((p) {
+                  items: _pilotos
+                      .where((p) => !_top10.contains(p) || _top10[index] == p)
+                      .map((p) {
                     return DropdownMenuItem(
                       value: p,
                       child: Text(p),
@@ -100,26 +98,35 @@ class _BetScreenState extends State<BetScreen> {
             }),
             const SizedBox(height: 16),
             const Text(
-              'DNFs (Selecciona quienes crees que no terminarán)',
+              'DNF (Selecciona quien no terminará)',
               style: TextStyle(color: Colors.white, fontSize: 18),
             ),
-            ..._pilotos.map((p) {
-              return CheckboxListTile(
-                title: Text(p, style: const TextStyle(color: Colors.white)),
-                value: _dnfs.contains(p),
-                onChanged: (val) {
-                  setState(() {
-                    if (val == true) {
-                      _dnfs.add(p);
-                    } else {
-                      _dnfs.remove(p);
-                    }
-                  });
-                },
-                activeColor: Colors.red,
-                checkColor: Colors.white,
-              );
-            }).toList(),
+            DropdownButtonFormField<String>(
+              dropdownColor: Colors.grey[900],
+              style: const TextStyle(color: Colors.white),
+              value: _selectedDnf.isNotEmpty ? _selectedDnf : null,
+              items: _pilotos.map((p) {
+                return DropdownMenuItem(
+                  value: p,
+                  child: Text(p),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _selectedDnf = val ?? '';
+                });
+              },
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.grey[800],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                hintText: 'Selecciona un piloto',
+                hintStyle: const TextStyle(color: Colors.white54),
+              ),
+            ),
             const SizedBox(height: 20),
             _isLoading
                 ? const CircularProgressIndicator(color: Colors.red)
@@ -127,19 +134,12 @@ class _BetScreenState extends State<BetScreen> {
                     onPressed: _confirmBet,
                     child: const Text('Confirmar Apuesta'),
                   ),
-            const SizedBox(height: 10),
-            if (_message != null)
-              Text(
-                _message!,
-                style: const TextStyle(color: Colors.green),
-              ),
           ],
         ),
       ),
     );
   }
 
-  // Lista mock de pilotos
   final List<String> _pilotos = [
     'Verstappen',
     'Hamilton',
@@ -163,31 +163,32 @@ class _BetScreenState extends State<BetScreen> {
   ];
 
   Future<void> _confirmBet() async {
-    if (_selectedPoleman.isEmpty) {
-      setState(() {
-        _message = 'Por favor, selecciona un poleman';
-      });
+    if (_top10.contains('')) {
+      _showDialog('Completa todas las posiciones del Top 10.',
+          const Color.fromARGB(255, 255, 17, 0), Icons.close);
       return;
     }
-    if (_top10.contains('')) {
-      setState(() {
-        _message = 'Completa todas las posiciones del Top 10';
-      });
+    if (_top10.toSet().length != _top10.length) {
+      _showDialog('No puedes repetir pilotos en el Top 10.',
+          const Color.fromARGB(255, 255, 17, 0), Icons.close);
+      return;
+    }
+    if (_selectedDnf.isEmpty) {
+      _showDialog('Por favor, selecciona un piloto como DNF.',
+          const Color.fromARGB(255, 250, 22, 5), Icons.close);
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _message = null;
     });
 
-    // Suponiendo que la carrera actual sea con ID "1"
     final bet = Bet(
-      userId: 'user1', // ID de ejemplo
+      userId: 'user1',
       raceId: '1',
       poleman: _selectedPoleman,
       top10: _top10,
-      dnfs: _dnfs,
+      dnfs: [_selectedDnf],
     );
 
     final success = await apiService.createBet(bet);
@@ -196,13 +197,51 @@ class _BetScreenState extends State<BetScreen> {
     });
 
     if (success) {
-      setState(() {
-        _message = 'Apuesta confirmada con éxito.';
-      });
+      _showDialog(
+          'Apuesta confirmada con éxito.', Colors.green, Icons.check_circle);
     } else {
-      setState(() {
-        _message = 'Error al enviar la apuesta.';
-      });
+      _showDialog('Error al enviar la apuesta.',
+          const Color.fromARGB(255, 255, 21, 4), Icons.close);
     }
+  }
+
+  void _showDialog(String message, Color color, IconData icon) {
+    showDialog(
+      context: context,
+      barrierDismissible: true, // No se puede cerrar tocando fuera del diálogo
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: color,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 50,
+                color: const Color.fromARGB(255, 247, 247, 247),
+              ),
+              const SizedBox(
+                height: 10,
+                width: 10,
+              ),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 14,
+                    color: const Color.fromARGB(255, 255, 255, 255)),
+              ),
+              const SizedBox(
+                height: 10,
+                width: 10,
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

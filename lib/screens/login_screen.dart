@@ -139,7 +139,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 10),
                       Text(
                         _error!,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(
+                            color: Color.fromARGB(255, 255, 17, 0)),
                       ),
                     ],
                     const SizedBox(height: 10),
@@ -176,8 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     // Check credentials (dummy check)
-    if (_emailController.text == "user@example.com" &&
-        _passwordController.text == "password") {
+    if (_emailController.text == "" && _passwordController.text == "") {
       Navigator.of(context).push(
         CheckeredTransitionRoute(page: const HomeScreen()),
       );
@@ -194,11 +194,11 @@ void main() {
     home: LoginScreen(),
     theme: ThemeData(
       brightness: Brightness.dark,
-      primaryColor: Colors.red,
+      primaryColor: const Color.fromARGB(255, 244, 16, 0),
       scaffoldBackgroundColor: Colors.black,
       textTheme: TextTheme(
         titleLarge: TextStyle(
-          color: Colors.red,
+          color: const Color.fromARGB(255, 253, 17, 0),
           fontSize: 32,
           fontWeight: FontWeight.bold,
         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../models/race.dart';
 import '../widgets/race_card.dart';
@@ -14,6 +15,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final ApiService apiService = ApiService();
   List<Race> races = [];
   bool _loading = true;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -34,61 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Próximas Carreras'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.pushNamed(context, '/profile');
-            },
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        backgroundColor: Colors.grey[900],
-        child: ListView(
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.red,
-              ),
-              child: const Text(
-                'Menú',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.home, color: Colors.white),
-              title:
-                  const Text('Inicio', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pushReplacementNamed(context, '/home'),
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.sports_motorsports, color: Colors.white),
-              title: const Text('Mis Apuestas',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pushNamed(context, '/bet'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.score, color: Colors.white),
-              title: const Text('Resultados',
-                  style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pushNamed(context, '/results'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.group, color: Colors.white),
-              title:
-                  const Text('Torneos', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pushNamed(context, '/tournaments'),
-            ),
-          ],
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          ? const Center(
+              child: CircularProgressIndicator(
+                  color: Color.fromARGB(255, 255, 17, 0)))
           : ListView.builder(
               padding: const EdgeInsets.all(8.0),
               itemCount: races.length,
@@ -104,6 +57,66 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+      floatingActionButton: FloatingActionButton(
+        shape: CircleBorder(),
+        foregroundColor: Colors.white,
+        onPressed: () {
+          Navigator.pushNamed(context, '/bet');
+        },
+        backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+        child: const Icon(CupertinoIcons.car_fill),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8.0,
+        color: Colors.grey[900],
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            IconButton(
+              icon: const Icon(CupertinoIcons.home, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 0;
+                });
+                // Navegación a Inicio
+              },
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.list_number, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 1;
+                });
+                Navigator.pushNamed(context, '/results');
+              },
+            ),
+            const SizedBox(width: 40), // Espacio para el FloatingActionButton
+
+            IconButton(
+              icon:
+                  const Icon(CupertinoIcons.person_3_fill, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 3;
+                });
+                Navigator.pushNamed(context, '/tournaments');
+              },
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.profile_circled,
+                  color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = 2;
+                });
+                Navigator.pushNamed(context, '/profile');
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

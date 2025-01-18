@@ -60,7 +60,9 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
         title: const Text('Torneos'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          ? const Center(
+              child: CircularProgressIndicator(
+                  color: Color.fromARGB(255, 255, 17, 1)))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -83,7 +85,10 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                   const SizedBox(height: 10),
                   ElevatedButton(
                     onPressed: _createTournament,
-                    child: const Text('Crear Torneo'),
+                    child: const Text(
+                      'Crear Torneo',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                   const Divider(
                       color: Colors.white54, thickness: 1, height: 30),
@@ -105,7 +110,10 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                   const SizedBox(height: 10),
                   ElevatedButton(
                     onPressed: _joinTournament,
-                    child: const Text('Unirse a Torneo'),
+                    child: const Text(
+                      'Unirse a Torneo',
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                   const SizedBox(height: 20),
                   // Lista de torneos

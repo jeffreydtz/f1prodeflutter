@@ -19,21 +19,27 @@ class F1BettingApp extends StatelessWidget {
       title: 'F1 Prode',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: Colors.red,
+        primaryColor: const Color.fromARGB(255, 255, 17, 0),
         scaffoldBackgroundColor: Colors.black,
         // Paleta de texto
         textTheme: const TextTheme(
+          bodySmall: TextStyle(color: Colors.white),
           bodyLarge: TextStyle(color: Colors.white),
           bodyMedium: TextStyle(color: Colors.white),
         ),
-        // Color de AppBar
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.transparent,
+          titleTextStyle: const TextStyle(
+            color: Color.fromARGB(255, 255, 255, 255),
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        // Color de AppBar
         // Botones
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
+            backgroundColor: const Color.fromARGB(255, 255, 17, 0),
           ),
         ),
       ),

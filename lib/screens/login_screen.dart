@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:f1prodeflutter/screens/home_screen.dart';
 import 'package:f1prodeflutter/main.dart';
+import 'register_screen.dart';
+import '../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -16,6 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String? _error;
 
+  final ApiService _apiService = ApiService();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -26,23 +30,21 @@ class _LoginScreenState extends State<LoginScreen> {
             bottom: 0,
             left: 0,
             right: 0,
-            height:
-                MediaQuery.of(context).size.height * 0.3, // 30% de la altura
+            height: MediaQuery.of(context).size.height * 0.3,
             child: GridView.builder(
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 8, // Número de cuadros horizontales
-                childAspectRatio:
-                    1.0, // Esto asegura que sean cuadrados perfectos
+                crossAxisCount: 8,
+                childAspectRatio: 1.0,
               ),
               itemBuilder: (context, index) {
-                int row = index ~/ 8; // Obtiene la fila actual
-                int col = index % 8; // Obtiene la columna actual
+                int row = index ~/ 8;
+                int col = index % 8;
                 return Container(
                   color: (row + col) % 2 == 0 ? Colors.black : Colors.white,
                 );
               },
-              itemCount: 64, // 8x8 cuadros
+              itemCount: 64,
             ),
           ),
           // Contenedor principal con gradiente
@@ -68,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    // Logo + Título
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -88,35 +91,19 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 40),
+                    // Campo email
                     TextField(
                       controller: _emailController,
                       style: const TextStyle(color: Colors.white),
-                      decoration: InputDecoration(
-                        hintText: 'Email',
-                        hintStyle: const TextStyle(color: Colors.white54),
-                        filled: true,
-                        fillColor: Colors.grey[800],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration: _buildTextFieldDecoration('Email'),
                     ),
                     const SizedBox(height: 20),
+                    // Campo password
                     TextField(
                       controller: _passwordController,
                       style: const TextStyle(color: Colors.white),
                       obscureText: true,
-                      decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: const TextStyle(color: Colors.white54),
-                        filled: true,
-                        fillColor: Colors.grey[800],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration: _buildTextFieldDecoration('Password'),
                     ),
                     const SizedBox(height: 20),
                     _isLoading
@@ -140,16 +127,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         _error!,
                         style: const TextStyle(
-                            color: Color.fromARGB(255, 255, 17, 0)),
+                          color: Color.fromARGB(255, 255, 17, 0),
+                        ),
                       ),
                     ],
                     const SizedBox(height: 10),
+
+                    // Olvidaste contraseña
                     TextButton(
                       onPressed: () {
-                        // Navigate to forgot password screen
+                        // Navigate to forgot password screen (si lo implementas)
                       },
                       child: const Text(
                         '¿Olvidaste tu contraseña?',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+
+                    // BOTÓN REGISTRO
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        '¿No tienes cuenta? Regístrate',
                         style: TextStyle(color: Colors.white54),
                       ),
                     ),
@@ -169,41 +175,53 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    // Simulate a network call
-    await Future.delayed(const Duration(seconds: 2));
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    // Check credentials (dummy check)
-    if (_emailController.text == "" && _passwordController.text == "") {
-      Navigator.of(context).push(
-        CheckeredTransitionRoute(page: const HomeScreen()),
-      );
-    } else {
+    if (email.isEmpty || password.isEmpty) {
       setState(() {
-        _error = 'Credenciales inválidas. Inténtalo de nuevo.';
+        _error = 'Completa Email y Password.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final success = await _apiService.login(email, password);
+
+      setState(() => _isLoading = false);
+
+      if (success) {
+        // Éxito: Navegar a HomeScreen
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Login exitoso!')),
+        );
+        Navigator.of(context).push(
+          CheckeredTransitionRoute(page: const HomeScreen()),
+        );
+      } else {
+        setState(() {
+          _error = 'Credenciales inválidas. Inténtalo de nuevo.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Error: $e';
       });
     }
   }
-}
 
-void main() {
-  runApp(MaterialApp(
-    home: LoginScreen(),
-    theme: ThemeData(
-      brightness: Brightness.dark,
-      primaryColor: const Color.fromARGB(255, 244, 16, 0),
-      scaffoldBackgroundColor: Colors.black,
-      textTheme: TextTheme(
-        titleLarge: TextStyle(
-          color: const Color.fromARGB(255, 253, 17, 0),
-          fontSize: 32,
-          fontWeight: FontWeight.bold,
-        ),
-        bodyLarge: TextStyle(color: Colors.white),
+  InputDecoration _buildTextFieldDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Colors.white54),
+      filled: true,
+      fillColor: Colors.grey[800],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
       ),
-    ),
-  ));
+    );
+  }
 }

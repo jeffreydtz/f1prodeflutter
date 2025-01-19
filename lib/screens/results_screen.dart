@@ -1,131 +1,135 @@
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../models/betresult.dart';
 
-class ResultsScreen extends StatelessWidget {
+class ResultsScreen extends StatefulWidget {
   const ResultsScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    // Datos mock de la última carrera
-    final String lastPoleman = 'Verstappen';
-    final List<String> lastTop10 = [
-      'Verstappen',
-      'Hamilton',
-      'Leclerc',
-      'Russell',
-      'Sainz',
-      'Perez',
-      'Alonso',
-      'Norris',
-      'Gasly',
-      'Ocon',
-    ];
-    final List<String> lastDnfs = ['Stroll', 'Magnussen'];
-    final int userPoints = 25;
+  State<ResultsScreen> createState() => _ResultsScreenState();
+}
 
+class _ResultsScreenState extends State<ResultsScreen> {
+  final ApiService apiService = ApiService();
+  List<BetResult> _results = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchResults();
+  }
+
+  Future<void> _fetchResults() async {
+    try {
+      // Suponiendo que conoces el userId
+      final userId = 'user1';
+      final fetchedResults = await apiService.getUserBetResults(userId);
+      setState(() {
+        _results = fetchedResults;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error fetching results: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Resultados'),
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _results.isEmpty
+              ? const Center(
+                  child: Text('No hay resultados',
+                      style: TextStyle(color: Colors.white)))
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _results.length,
+                  itemBuilder: (context, index) {
+                    final betRes = _results[index];
+                    return _buildResultItem(betRes);
+                  },
+                ),
+    );
+  }
+
+  Widget _buildResultItem(BetResult betRes) {
+    return Card(
+      color: Colors.grey[900],
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Última Carrera',
-              style: TextStyle(
+            Text(
+              betRes.raceName,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 6),
+            Text(
+              'Fecha: ${betRes.date}',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            const Divider(color: Colors.white54, thickness: 1, height: 20),
+
+            // POLE
             _buildSectionTitle('Pole Position'),
             _buildItemWithDetail(
-              title: lastPoleman,
-              detail: 'Piloto que inició en la pole.',
+              title: 'Apostado: ${betRes.polemanUser}',
+              detail: 'Real: ${betRes.polemanReal}',
               icon: Icons.flag,
             ),
-            const SizedBox(height: 20),
-            _buildSectionTitle('Top 10 Final'),
-            ...lastTop10.asMap().entries.map((entry) {
-              final index = entry.key;
-              final pilot = entry.value;
+            const SizedBox(height: 12),
 
-              return ListTile(
-                leading: index < 3
-                    ? Icon(
-                        index == 0
-                            ? Icons.emoji_events
-                            : index == 1
-                                ? Icons.emoji_events
-                                : Icons.emoji_events,
-                        color: index == 0
-                            ? Colors.amber
-                            : index == 1
-                                ? Colors.grey
-                                : Colors.brown,
-                        size: 30,
-                      )
-                    : CircleAvatar(
-                        backgroundColor: Colors.grey[800],
-                        child: Text(
-                          (index + 1).toString(),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                title: Text(
-                  pilot,
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
-                ),
-              );
-            }).toList(),
-            const SizedBox(height: 20),
+            // TOP 10
+            _buildSectionTitle('Top 10 Final'),
+            const SizedBox(height: 8),
+            _buildTop10Comparison(betRes.top10User, betRes.top10Real),
+
+            const SizedBox(height: 12),
+
+            // DNF
             _buildSectionTitle('DNFs'),
-            if (lastDnfs.isNotEmpty)
-              ...lastDnfs.map(
-                (pilot) => ListTile(
-                  leading: const Icon(Icons.car_crash, color: Colors.red),
-                  title: Text(
-                    pilot,
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                ),
-              )
-            else
-              const Text(
-                'Ningún piloto abandonó.',
-                style: TextStyle(color: Colors.white54, fontSize: 16),
-              ),
-            const Divider(color: Colors.white54, thickness: 1, height: 30),
+            const SizedBox(height: 8),
+            _buildDnfComparison(betRes.dnfUser, betRes.dnfReal),
+
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white54, thickness: 1, height: 20),
+
+            // PUNTOS
             _buildSectionTitle('Puntaje Obtenido'),
             Text(
-              'Tus puntos en esta carrera: $userPoints',
+              'Puntos en esta carrera: ${betRes.points}',
               style: const TextStyle(color: Colors.white, fontSize: 20),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Puntuacion:',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+
+            // Detalle de puntuación
+            if (betRes.pointsBreakdown.isNotEmpty) ...[
+              const Text(
+                'Desglose de puntos:',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              '- Acierto en la pole: +10 puntos',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            const Text(
-              '- Acertaste 5 posiciones en el Top 10: +15 puntos',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            const Text(
-              '- Predicción correcta de DNF: +5 puntos',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            const SizedBox(height: 20),
+              ...betRes.pointsBreakdown.map((line) => Text(
+                    '- $line',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ))
+            ],
           ],
         ),
       ),
@@ -137,7 +141,7 @@ class ResultsScreen extends StatelessWidget {
       title,
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 22,
+        fontSize: 20,
         fontWeight: FontWeight.bold,
       ),
     );
@@ -146,21 +150,126 @@ class ResultsScreen extends StatelessWidget {
   Widget _buildItemWithDetail(
       {required String title, required String detail, IconData? icon}) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (icon != null) Icon(icon, color: Colors.amber, size: 30),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
-            ),
-            Text(
-              detail,
-              style: const TextStyle(color: Colors.white70, fontSize: 14),
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+              Text(
+                detail,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+            ],
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildTop10Comparison(List<String> userTop10, List<String> realTop10) {
+    // Ejemplo: una columna con 2 secciones: "Tu predicción" vs "Resultado final".
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Predicción
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Apostado:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              ...userTop10.asMap().entries.map((entry) {
+                final index = entry.key;
+                final pilot = entry.value;
+                return Text(
+                  '${index + 1}. $pilot',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        // Resultado real
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Real:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              ...realTop10.asMap().entries.map((entry) {
+                final index = entry.key;
+                final pilot = entry.value;
+                return Text(
+                  '${index + 1}. $pilot',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDnfComparison(List<String> userDnf, List<String> realDnf) {
+    if (realDnf.isEmpty && userDnf.isEmpty) {
+      return const Text('No hubo DNFs',
+          style: TextStyle(color: Colors.white, fontSize: 16));
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Apostado
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Apostado:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              userDnf.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: userDnf
+                          .map((pilot) => Text(pilot,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 16)))
+                          .toList(),
+                    )
+                  : const Text('Ningún DNF apostado',
+                      style: TextStyle(color: Colors.white54)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        // Real
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Real:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              realDnf.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: realDnf
+                          .map((pilot) => Text(pilot,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 16)))
+                          .toList(),
+                    )
+                  : const Text('Nadie abandonó',
+                      style: TextStyle(color: Colors.white54)),
+            ],
+          ),
         ),
       ],
     );

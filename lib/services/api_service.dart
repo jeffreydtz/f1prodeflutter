@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../models/betresult.dart';
 import '../models/user.dart';
 import '../models/race.dart';
 import '../models/bet.dart';
@@ -16,11 +17,47 @@ class ApiService {
   /// Usa "10.0.2.2" si corres la app en un emulador Android local.
   static const String baseUrl = 'http://127.0.0.1:8000/api';
 
+  /// Variable para almacenar el usuario logueado
   UserModel? currentUser;
 
-  /// LOGIN
-  /// Ejemplo de método que envía email y password a un endpoint de login.
-  /// Ajusta según tu lógica real en Django.
+  // -------------------------------------------------
+  // 1. REGISTER (CREACIÓN DE USUARIO)
+  // -------------------------------------------------
+  /// Envía username, email, password a /users/register/
+  /// Retorna true si se creó el usuario (código 201), false si ocurrió error.
+  Future<bool> register(String username, String email, String password) async {
+    final url = Uri.parse('$baseUrl/users/register/');
+    final body = {
+      'username': username,
+      'email': email,
+      'password': password,
+    };
+
+    try {
+      final response = await http.post(url, body: body);
+
+      if (response.statusCode == 201) {
+        // Suponiendo que el backend crea el usuario y puede retornar algún mensaje
+        // o incluso la info del nuevo user en JSON.
+        // Si quieres, puedes parsear 'response.body' para guardarlo en 'currentUser'.
+        // Por ahora, retornamos true al crearse con éxito:
+        return true;
+      } else {
+        // Maneja error según la respuesta del servidor
+        print('Error en registro: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('Exception en register: $e');
+      return false;
+    }
+  }
+
+  // -------------------------------------------------
+  // 2. LOGIN
+  // -------------------------------------------------
+  /// Ejemplo de método que envía email y password a un endpoint de login
+  /// (POST /users/login/). Ajusta según tu lógica real en Django.
   Future<bool> login(String email, String password) async {
     final url = Uri.parse('$baseUrl/users/login/');
     final body = {
@@ -31,28 +68,32 @@ class ApiService {
     try {
       final response = await http.post(url, body: body);
       if (response.statusCode == 200) {
-        // Supongamos que el servidor devuelve algo así:
-        // { "id": "user1", "username": "UsuarioF1", "email": "...", ... }
+        // Supongamos que el servidor devuelve algo tipo:
+        // { "id": "user1", "username": "UsuarioF1", "email": "..." }
         final data = jsonDecode(response.body);
+
         currentUser = UserModel(
           id: data['id'],
           email: data['email'],
           username: data['username'],
-          // Ojo: normalmente no devuelves el password. Ajusta a tu gusto.
+          // Normalmente no devuelves password. Ajusta si lo necesitas.
           password: password,
         );
         return true;
       } else {
         // Manejo de error por status != 200
+        print('Error en login: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      // Manejo de errores de conexión
+      print('Exception en login: $e');
       return false;
     }
   }
 
-  /// OBTENER CARRERAS
+  // -------------------------------------------------
+  // 3. OBTENER CARRERAS
+  // -------------------------------------------------
   /// Llama al endpoint en Django que devuelve las próximas carreras (JSON).
   Future<List<Race>> getRaces() async {
     final url = Uri.parse('$baseUrl/f1/upcoming-races/');
@@ -60,19 +101,11 @@ class ApiService {
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        // Decodificamos la respuesta
         final Map<String, dynamic> jsonBody = jsonDecode(response.body);
-
-        // Accedemos a la clave "MRData"
         final mrData = jsonBody['MRData'] as Map<String, dynamic>;
-
-        // Dentro de MRData, accedemos a "RaceTable"
         final raceTable = mrData['RaceTable'] as Map<String, dynamic>;
-
-        // Dentro de "RaceTable", accedemos a la lista "Races"
         final List<dynamic> racesList = raceTable['Races'];
 
-        // Ahora sí mapeamos la lista de carreras a objetos Race
         return racesList.map((raceJson) => Race.fromJson(raceJson)).toList();
       } else {
         throw Exception('Error al obtener carreras: ${response.statusCode}');
@@ -82,28 +115,24 @@ class ApiService {
     }
   }
 
-  //Get drivers
+  // -------------------------------------------------
+  // 4. OBTENER DRIVERS
+  // -------------------------------------------------
+  /// Llama a /f1/drivers/ (JSON) y devuelve una lista de nombres de piloto
   Future<List<String>> getDrivers() async {
     final url = Uri.parse('$baseUrl/f1/drivers/');
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        // Decodifica la respuesta
         final Map<String, dynamic> jsonBody = jsonDecode(response.body);
-
-        // Accede a MRData -> DriverTable -> Drivers
         final mrData = jsonBody['MRData'] as Map<String, dynamic>;
         final driverTable = mrData['DriverTable'] as Map<String, dynamic>;
         final List<dynamic> driversList = driverTable['Drivers'];
 
-        // Extraer el nombre con la lógica que quieras:
-        // Ejemplo: "driverId" o "givenName familyName"
-        // Devuelvo una lista de strings (pilotos)
         final List<String> pilotNames = driversList.map((driverJson) {
           final Map<String, dynamic> d = driverJson as Map<String, dynamic>;
           final givenName = d['givenName'] ?? '';
           final familyName = d['familyName'] ?? '';
-          // Combino en un solo string, o uso el "driverId" si prefieres
           return '$givenName $familyName';
         }).toList();
 
@@ -116,100 +145,32 @@ class ApiService {
     }
   }
 
-  /// CREAR APUESTA
-  /// Envía los datos de la apuesta a tu backend
-  // Future<bool> createBet(Bet bet) async {
-  //   final url = Uri.parse('$baseUrl/bets/');
-  //   // Ajusta el body al formato que tu Django espera (probablemente JSON).
-  //   final body = jsonEncode({
-  //     'user': bet.userId,
-  //     'season': bet.season,
-  //     'round_number': bet.roundNumber,
-  //     'predicted_winner': bet.predictedWinner,
-  //     // otros campos...
-  //   });
+  // -------------------------------------------------
+  // 5. OBTENER RESULTADOS DE APUESTAS
+  // -------------------------------------------------
+  /// Llama a /bets/results/?user_id=... y devuelve una lista de BetResult
+  Future<List<BetResult>> getUserBetResults(String userId) async {
+    final url = Uri.parse('$baseUrl/bets/results/?user_id=$userId');
 
-  //   try {
-  //     final response = await http.post(
-  //       url,
-  //       headers: {'Content-Type': 'application/json'},
-  //       body: body,
-  //     );
-  //     if (response.statusCode == 201 || response.statusCode == 200) {
-  //       return true;
-  //     } else {
-  //       // Manejo de error si la creación no fue exitosa
-  //       return false;
-  //     }
-  //   } catch (e) {
-  //     throw Exception('Error al crear apuesta: $e');
-  //   }
-  // }
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonBody = jsonDecode(response.body);
+        final List<dynamic> results = jsonBody['results'];
+        return results.map((item) => BetResult.fromJson(item)).toList();
+      } else {
+        throw Exception('Error al obtener resultados: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
+  }
 
-  /// OBTENER TORNEOS
-  /// Llama a un endpoint para obtener la lista de torneos.
-  // Future<List<Tournament>> getTournaments() async {
-  //   final url = Uri.parse('$baseUrl/tournaments/');
-  //   try {
-  //     final response = await http.get(url);
-  //     if (response.statusCode == 200) {
-  //       final List<dynamic> data = jsonDecode(response.body);
-  //       return data.map((item) => Tournament.fromJson(item)).toList();
-  //     } else {
-  //       throw Exception('Error al obtener torneos: ${response.statusCode}');
-  //     }
-  //   } catch (e) {
-  //     throw Exception('Error de conexión: $e');
-  //   }
-  // }
-
-  /// CREAR TORNEO
-  // Future<Tournament> createTournament(String name) async {
-  //   final url = Uri.parse('$baseUrl/tournaments/');
-  //   final body = jsonEncode({
-  //     'name': name,
-  //     // si tu backend requiere algún otro campo, agrégalo acá
-  //   });
-
-  //   try {
-  //     final response = await http.post(
-  //       url,
-  //       headers: {'Content-Type': 'application/json'},
-  //       body: body,
-  //     );
-  //     if (response.statusCode == 201 || response.statusCode == 200) {
-  //       final Map<String, dynamic> data = jsonDecode(response.body);
-  //       return Tournament.fromJson(data);
-  //     } else {
-  //       throw Exception('Error al crear torneo: ${response.statusCode}');
-  //     }
-  //   } catch (e) {
-  //     throw Exception('Error de conexión: $e');
-  //   }
-  // }
-
-  /// UNIRSE A TORNEO
-  // Future<bool> joinTournament(String code) async {
-  //   final url = Uri.parse('$baseUrl/tournaments/join/');
-  //   final body = jsonEncode({
-  //     'invite_code': code,
-  //     // posiblemente tu userID
-  //     'user_id': currentUser?.id ?? 'user1',
-  //   });
-
-  //   try {
-  //     final response = await http.post(
-  //       url,
-  //       headers: {'Content-Type': 'application/json'},
-  //       body: body,
-  //     );
-  //     if (response.statusCode == 200) {
-  //       return true;
-  //     } else {
-  //       return false;
-  //     }
-  //   } catch (e) {
-  //     throw Exception('Error al unirse a torneo: $e');
-  //   }
-  // }
+  // -------------------------------------------------
+  // EJEMPLOS COMENTADOS (APUESTAS/TORNEOS) ...
+  // -------------------------------------------------
+  // Future<bool> createBet(Bet bet) async { ... }
+  // Future<List<Tournament>> getTournaments() async { ... }
+  // Future<Tournament> createTournament(String name) async { ... }
+  // Future<bool> joinTournament(String code) async { ... }
 }

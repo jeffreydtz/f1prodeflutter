@@ -70,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
+        shadowColor: Colors.transparent,
         color: Colors.grey[900],
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,

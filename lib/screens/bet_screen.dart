@@ -12,10 +12,31 @@ class BetScreen extends StatefulWidget {
 class _BetScreenState extends State<BetScreen> {
   final ApiService apiService = ApiService();
 
+  // Estas listas se poblarán dinámicamente en initState
+  List<String> _pilotos = []; // Se llena con getDrivers()
+
   String _selectedPoleman = '';
   List<String> _top10 = List.filled(10, '');
   String _selectedDnf = '';
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDrivers();
+  }
+
+  Future<void> _fetchDrivers() async {
+    try {
+      final fetchedDrivers = await apiService.getDrivers();
+      setState(() {
+        _pilotos = fetchedDrivers;
+      });
+    } catch (e) {
+      print('Error fetching drivers: $e');
+      // Aquí podrías mostrar un diálogo o snackbar de error
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +53,8 @@ class _BetScreenState extends State<BetScreen> {
               style: TextStyle(color: Colors.white, fontSize: 18),
             ),
             const SizedBox(height: 8),
+
+            // POLEMAN
             DropdownButtonFormField<String>(
               dropdownColor: Colors.grey[900],
               style: const TextStyle(color: Colors.white),
@@ -59,6 +82,8 @@ class _BetScreenState extends State<BetScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
+            // TOP 10
             const Text(
               'Top 10 Final (Orden)',
               style: TextStyle(color: Colors.white, fontSize: 18),
@@ -97,6 +122,8 @@ class _BetScreenState extends State<BetScreen> {
               );
             }),
             const SizedBox(height: 16),
+
+            // DNF
             const Text(
               'DNF (Selecciona quien no terminará)',
               style: TextStyle(color: Colors.white, fontSize: 18),
@@ -128,6 +155,8 @@ class _BetScreenState extends State<BetScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // BOTÓN CONFIRMAR
             _isLoading
                 ? const CircularProgressIndicator(color: Colors.red)
                 : ElevatedButton(
@@ -139,28 +168,6 @@ class _BetScreenState extends State<BetScreen> {
       ),
     );
   }
-
-  final List<String> _pilotos = [
-    'Verstappen',
-    'Hamilton',
-    'Leclerc',
-    'Norris',
-    'Russell',
-    'Sainz',
-    'Alonso',
-    'Perez',
-    'Gasly',
-    'Ocon',
-    'Stroll',
-    'Bottas',
-    'Zhou',
-    'Hulkenberg',
-    'Magnussen',
-    'Tsunoda',
-    'De Vries',
-    'Piastri',
-    'Ricciardo',
-  ];
 
   Future<void> _confirmBet() async {
     if (_top10.contains('')) {
@@ -191,24 +198,26 @@ class _BetScreenState extends State<BetScreen> {
       dnfs: [_selectedDnf],
     );
 
-    final success = await apiService.createBet(bet);
+    // En caso de que llames a tu backend real, descomenta:
+    // final success = await apiService.createBet(bet);
+
     setState(() {
       _isLoading = false;
     });
 
-    if (success) {
-      _showDialog(
-          'Apuesta confirmada con éxito.', Colors.green, Icons.check_circle);
-    } else {
-      _showDialog('Error al enviar la apuesta.',
-          const Color.fromARGB(255, 255, 21, 4), Icons.close);
-    }
+    // if (success) {
+    //   _showDialog(
+    //       'Apuesta confirmada con éxito.', Colors.green, Icons.check_circle);
+    // } else {
+    //   _showDialog('Error al enviar la apuesta.',
+    //       const Color.fromARGB(255, 255, 21, 4), Icons.close);
+    // }
   }
 
   void _showDialog(String message, Color color, IconData icon) {
     showDialog(
       context: context,
-      barrierDismissible: true, // No se puede cerrar tocando fuera del diálogo
+      barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: color,
@@ -218,26 +227,14 @@ class _BetScreenState extends State<BetScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 50,
-                color: const Color.fromARGB(255, 247, 247, 247),
-              ),
-              const SizedBox(
-                height: 10,
-                width: 10,
-              ),
+              Icon(icon, size: 50, color: Colors.white),
+              const SizedBox(height: 10),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 14,
-                    color: const Color.fromARGB(255, 255, 255, 255)),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
               ),
-              const SizedBox(
-                height: 10,
-                width: 10,
-              ),
+              const SizedBox(height: 10),
             ],
           ),
         );

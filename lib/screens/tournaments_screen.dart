@@ -22,36 +22,36 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchTournaments();
+    // _fetchTournaments();
   }
 
-  Future<void> _fetchTournaments() async {
-    final data = await apiService.getTournaments();
-    setState(() {
-      tournaments = data;
-      _loading = false;
-    });
-  }
+  // Future<void> _fetchTournaments() async {
+  //   final data = await apiService.getTournaments();
+  //   setState(() {
+  //     tournaments = data;
+  //     _loading = false;
+  //   });
+  // }
 
-  Future<void> _createTournament() async {
-    if (_tournamentNameController.text.isEmpty) return;
-    final newTournament =
-        await apiService.createTournament(_tournamentNameController.text);
-    setState(() {
-      tournaments.add(newTournament);
-    });
-    _tournamentNameController.clear();
-  }
+  // Future<void> _createTournament() async {
+  //   if (_tournamentNameController.text.isEmpty) return;
+  //   final newTournament =
+  //       await apiService.createTournament(_tournamentNameController.text);
+  //   setState(() {
+  //     tournaments.add(newTournament);
+  //   });
+  //   _tournamentNameController.clear();
+  // }
 
-  Future<void> _joinTournament() async {
-    if (_inviteCodeController.text.isEmpty) return;
-    final joined = await apiService.joinTournament(_inviteCodeController.text);
-    if (joined) {
-      // Se volvió a obtener la lista actualizada
-      _fetchTournaments();
-    }
-    _inviteCodeController.clear();
-  }
+  // Future<void> _joinTournament() async {
+  //   if (_inviteCodeController.text.isEmpty) return;
+  //   final joined = await apiService.joinTournament(_inviteCodeController.text);
+  //   if (joined) {
+  //     // Se volvió a obtener la lista actualizada
+  //     _fetchTournaments();
+  //   }
+  //   _inviteCodeController.clear();
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -83,13 +83,13 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _createTournament,
-                    child: const Text(
-                      'Crear Torneo',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
+                  // ElevatedButton(
+                  //   onPressed: _createTournament,
+                  //   child: const Text(
+                  //     'Crear Torneo',
+                  //     style: TextStyle(color: Colors.white),
+                  //   ),
+                  // ),
                   const Divider(
                       color: Colors.white54, thickness: 1, height: 30),
                   // Unirse a Torneo
@@ -108,13 +108,13 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: _joinTournament,
-                    child: const Text(
-                      'Unirse a Torneo',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
+                  // ElevatedButton(
+                  //   onPressed: _joinTournament,
+                  //   child: const Text(
+                  //     'Unirse a Torneo',
+                  //     style: TextStyle(color: Colors.white),
+                  //   ),
+                  // ),
                   const SizedBox(height: 20),
                   // Lista de torneos
                   const Text(

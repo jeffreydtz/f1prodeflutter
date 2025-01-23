@@ -1,25 +1,74 @@
+import 'package:f1prodeflutter/services/api_service.dart';
 import 'package:flutter/material.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    // Mock de datos de usuario para pruebas
-    final Map<String, dynamic> mockUser = {
-      'username': 'TestUser',
-      'email': 'testuser@example.com',
-      'points': 120,
-      'racesPlayed': 5,
-      'polesGuessed': 2,
-    };
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
-    final String username = mockUser['username'];
-    final String email = mockUser['email'];
-    final int totalPoints = mockUser['points'];
-    final int racesPlayed = mockUser['racesPlayed'];
-    final int polesGuessed = mockUser['polesGuessed'];
-    final String userRank = 'Corredor Pro'; // Ejemplo de rango
+class _ProfileScreenState extends State<ProfileScreen> {
+  final ApiService _apiService = ApiService();
+  bool _isLoading = true;
+  Map<String, dynamic>? _userData;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final userData = await _apiService.getUserProfile();
+      if (mounted) {
+        setState(() {
+          _userData = userData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 255, 17, 0),
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Text(
+            'Error: $_error',
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+
+    final userData = _userData!;
+    final username = userData['username'] ?? 'N/A';
+    final email = userData['email'] ?? 'N/A';
+    final totalPoints = userData['points'] ?? 0;
+    final racesPlayed = userData['races_played'] ?? 0;
+    final polesGuessed = userData['poles_guessed'] ?? 0;
+    final userRank = _calculateRank(totalPoints);
 
     return Scaffold(
       appBar: AppBar(
@@ -156,5 +205,13 @@ class ProfileScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _calculateRank(int points) {
+    if (points >= 500) return 'Campeón Mundial';
+    if (points >= 300) return 'Piloto Elite';
+    if (points >= 200) return 'Piloto Profesional';
+    if (points >= 100) return 'Piloto Amateur';
+    return 'Novato';
   }
 }

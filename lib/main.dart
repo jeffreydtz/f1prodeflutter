@@ -47,7 +47,13 @@ class F1BettingApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
-        '/bet': (context) => const BetScreen(),
+        '/bet': (context) => BetScreen(
+              raceName: '',
+              date: '',
+              circuit: '',
+              season: '',
+              round: '',
+            ),
         '/results': (context) => const ResultsScreen(),
         '/tournaments': (context) => const TournamentsScreen(),
         '/profile': (context) => const ProfileScreen(),

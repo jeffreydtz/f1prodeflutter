@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   bool _isLoading = false;
@@ -91,11 +91,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 40),
-                    // Campo email
+                    // Campo username
                     TextField(
-                      controller: _emailController,
+                      controller: _usernameController,
                       style: const TextStyle(color: Colors.white),
-                      decoration: _buildTextFieldDecoration('Email'),
+                      decoration: _buildTextFieldDecoration('Username'),
                     ),
                     const SizedBox(height: 20),
                     // Campo password
@@ -175,39 +175,28 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (email.isEmpty || password.isEmpty) {
-      setState(() {
-        _error = 'Completa Email y Password.';
-        _isLoading = false;
-      });
-      return;
-    }
-
     try {
-      final success = await _apiService.login(email, password);
-
-      setState(() => _isLoading = false);
+      final success = await _apiService.login(
+          _usernameController.text.trim(), _passwordController.text.trim());
 
       if (success) {
-        // Éxito: Navegar a HomeScreen
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Login exitoso!')),
-        );
-        Navigator.of(context).push(
-          CheckeredTransitionRoute(page: const HomeScreen()),
-        );
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            CheckeredTransitionRoute(
+              page: const HomeScreen(),
+            ),
+          );
+        }
       } else {
         setState(() {
-          _error = 'Credenciales inválidas. Inténtalo de nuevo.';
+          _error = 'Credenciales inválidas';
+          _isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
+        _error = 'Error de conexión';
         _isLoading = false;
-        _error = 'Error: $e';
       });
     }
   }
@@ -221,6 +210,32 @@ class _LoginScreenState extends State<LoginScreen> {
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
+      ),
+    );
+  }
+}
+
+class CheckeredFlagAnimation extends StatelessWidget {
+  const CheckeredFlagAnimation({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black,
+      child: GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 8,
+          childAspectRatio: 1.0,
+        ),
+        itemBuilder: (context, index) {
+          int row = index ~/ 8;
+          int col = index % 8;
+          return Container(
+            color: (row + col) % 2 == 0 ? Colors.black : Colors.white,
+          );
+        },
+        itemCount: 64, // 8x8 grid
       ),
     );
   }

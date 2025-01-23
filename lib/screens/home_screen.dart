@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../models/race.dart';
 import '../widgets/race_card.dart';
+import '../screens/bet_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -24,11 +25,27 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchRaces() async {
-    final fetchedRaces = await apiService.getRaces();
-    setState(() {
-      races = fetchedRaces;
-      _loading = false;
-    });
+    try {
+      final fetchedRaces = await apiService.getRaces();
+      if (mounted) {
+        setState(() {
+          races = fetchedRaces;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -51,17 +68,43 @@ class _HomeScreenState extends State<HomeScreen> {
                   raceName: race.name,
                   date: race.date,
                   circuit: race.circuit,
+                  season: race.season,
+                  round: race.round,
                   onBetPressed: () {
-                    Navigator.pushNamed(context, '/bet');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BetScreen(
+                          raceName: race.name,
+                          date: race.date,
+                          circuit: race.circuit,
+                          season: race.season,
+                          round: race.round,
+                        ),
+                      ),
+                    );
                   },
                 );
               },
             ),
       floatingActionButton: FloatingActionButton(
-        shape: CircleBorder(),
+        shape: const CircleBorder(),
         foregroundColor: Colors.white,
         onPressed: () {
-          Navigator.pushNamed(context, '/bet');
+          if (races.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BetScreen(
+                  raceName: races[0].name,
+                  date: races[0].date,
+                  circuit: races[0].circuit,
+                  season: races[0].season,
+                  round: races[0].round,
+                ),
+              ),
+            );
+          }
         },
         backgroundColor: const Color.fromARGB(255, 255, 17, 0),
         child: const Icon(CupertinoIcons.car_fill),

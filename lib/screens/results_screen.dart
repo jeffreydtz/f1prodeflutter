@@ -13,6 +13,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
   final ApiService apiService = ApiService();
   List<BetResult> _results = [];
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,41 +23,76 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
   Future<void> _fetchResults() async {
     try {
-      // Suponiendo que conoces el userId
-      final userId = 'user1';
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final userId = await apiService.getCurrentUserId();
+      if (userId == null) throw Exception('Usuario no autenticado');
       final fetchedResults = await apiService.getUserBetResults(userId);
-      setState(() {
-        _results = fetchedResults;
-        _isLoading = false;
-      });
+
+      if (mounted) {
+        setState(() {
+          _results = fetchedResults;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error fetching results: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color.fromARGB(255, 255, 17, 0),
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Mis Resultados'),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Error: $_error',
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _fetchResults,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Resultados'),
+        title: const Text('Mis Resultados'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _results.isEmpty
-              ? const Center(
-                  child: Text('No hay resultados',
-                      style: TextStyle(color: Colors.white)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) {
-                    final betRes = _results[index];
-                    return _buildResultItem(betRes);
-                  },
-                ),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _results.length,
+        itemBuilder: (context, index) => _buildResultItem(_results[index]),
+      ),
     );
   }
 
@@ -69,13 +105,35 @@ class _ResultsScreenState extends State<ResultsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              betRes.raceName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    betRes.raceName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (!betRes.isComplete)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Pendiente',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 6),
             Text(
@@ -85,50 +143,72 @@ class _ResultsScreenState extends State<ResultsScreen> {
             const Divider(color: Colors.white54, thickness: 1, height: 20),
 
             // POLE
-            _buildSectionTitle('Pole Position'),
-            _buildItemWithDetail(
-              title: 'Apostado: ${betRes.polemanUser}',
-              detail: 'Real: ${betRes.polemanReal}',
-              icon: Icons.flag,
+            _buildSectionTitle('Tu Apuesta de Pole Position'),
+            Text(
+              betRes.polemanUser,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
+            if (betRes.isComplete && betRes.polemanReal != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Resultado: ${betRes.polemanReal}',
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
             const SizedBox(height: 12),
 
             // TOP 10
-            _buildSectionTitle('Top 10 Final'),
+            _buildSectionTitle('Tu Apuesta del Top 10'),
             const SizedBox(height: 8),
-            _buildTop10Comparison(betRes.top10User, betRes.top10Real),
+            if (betRes.isComplete && betRes.top10Real != null)
+              _buildTop10Comparison(betRes.top10User, betRes.top10Real!)
+            else
+              _buildTop10List(betRes.top10User),
 
             const SizedBox(height: 12),
 
             // DNF
-            _buildSectionTitle('DNFs'),
+            _buildSectionTitle('Tu Apuesta de DNFs'),
             const SizedBox(height: 8),
-            _buildDnfComparison(betRes.dnfUser, betRes.dnfReal),
+            if (betRes.isComplete && betRes.dnfReal != null)
+              _buildDnfComparison(betRes.dnfUser, betRes.dnfReal!)
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: betRes.dnfUser
+                    .map((pilot) => Text(
+                          pilot,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 16),
+                        ))
+                    .toList(),
+              ),
 
-            const SizedBox(height: 12),
-            const Divider(color: Colors.white54, thickness: 1, height: 20),
-
-            // PUNTOS
-            _buildSectionTitle('Puntaje Obtenido'),
-            Text(
-              'Puntos en esta carrera: ${betRes.points}',
-              style: const TextStyle(color: Colors.white, fontSize: 20),
-            ),
-            const SizedBox(height: 10),
-
-            // Detalle de puntuación
-            if (betRes.pointsBreakdown.isNotEmpty) ...[
-              const Text(
-                'Desglose de puntos:',
-                style: TextStyle(
+            if (betRes.isComplete) ...[
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white54, thickness: 1, height: 20),
+              // PUNTOS
+              _buildSectionTitle('Puntaje Obtenido'),
+              Text(
+                'Puntos en esta carrera: ${betRes.points ?? 0}',
+                style: const TextStyle(color: Colors.white, fontSize: 20),
+              ),
+              if (betRes.pointsBreakdown.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'Desglose de puntos:',
+                  style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
-                    fontWeight: FontWeight.bold),
-              ),
-              ...betRes.pointsBreakdown.map((line) => Text(
-                    '- $line',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ))
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                ...betRes.pointsBreakdown.map((line) => Text(
+                      '- $line',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 14),
+                    )),
+              ],
             ],
           ],
         ),
@@ -147,29 +227,17 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  Widget _buildItemWithDetail(
-      {required String title, required String detail, IconData? icon}) {
-    return Row(
+  Widget _buildTop10List(List<String> top10) {
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (icon != null) Icon(icon, color: Colors.amber, size: 30),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              Text(
-                detail,
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ],
-          ),
-        )
-      ],
+      children: top10.asMap().entries.map((entry) {
+        final index = entry.key;
+        final pilot = entry.value;
+        return Text(
+          '${index + 1}. $pilot',
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+        );
+      }).toList(),
     );
   }
 

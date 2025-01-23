@@ -4,6 +4,8 @@ class RaceCard extends StatelessWidget {
   final String raceName;
   final String date;
   final String circuit;
+  final String season;
+  final String round;
   final VoidCallback onBetPressed;
 
   const RaceCard({
@@ -11,6 +13,8 @@ class RaceCard extends StatelessWidget {
     required this.raceName,
     required this.date,
     required this.circuit,
+    required this.season,
+    required this.round,
     required this.onBetPressed,
   }) : super(key: key);
 

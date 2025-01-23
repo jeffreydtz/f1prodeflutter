@@ -15,12 +15,11 @@ class Race {
 
   factory Race.fromJson(Map<String, dynamic> json) {
     return Race(
-      season: json['season'],
-      round: json['round'],
-      name: json['raceName'],
-      date: json['date'],
-      // Tomar circuit name de la subclave 'Circuit'
-      circuit: json['Circuit']?['circuitName'] ?? 'N/A',
+      season: json['season'].toString(),
+      round: json['round'].toString(),
+      name: json['name'] ?? json['raceName'] ?? 'N/A',
+      date: json['date'] ?? 'N/A',
+      circuit: json['circuit'] ?? 'N/A',
     );
   }
 }

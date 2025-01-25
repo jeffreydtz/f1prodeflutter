@@ -12,4 +12,14 @@ class UserModel {
     required this.password,
     this.points = 0,
   });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'].toString(),
+      username: json['username'] ?? '',
+      email: json['email'] ?? '',
+      password: '', // El backend no envía el password
+      points: json['points'] ?? 0,
+    );
+  }
 }

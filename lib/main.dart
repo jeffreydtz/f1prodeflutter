@@ -53,6 +53,7 @@ class F1BettingApp extends StatelessWidget {
               circuit: '',
               season: '',
               round: '',
+              hasSprint: false,
             ),
         '/results': (context) => const ResultsScreen(),
         '/tournaments': (context) => const TournamentsScreen(),

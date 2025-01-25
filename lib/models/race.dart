@@ -4,6 +4,7 @@ class Race {
   final String name; // raceName
   final String date; // date
   final String circuit; // circuitName (de Circuit)
+  final bool hasSprint; // Nuevo campo
 
   Race({
     required this.season,
@@ -11,6 +12,7 @@ class Race {
     required this.name,
     required this.date,
     required this.circuit,
+    required this.hasSprint, // Nuevo campo
   });
 
   factory Race.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class Race {
       name: json['name'] ?? json['raceName'] ?? 'N/A',
       date: json['date'] ?? 'N/A',
       circuit: json['circuit'] ?? 'N/A',
+      hasSprint: json['has_sprint'] ?? false, // Nuevo campo
     );
   }
 }

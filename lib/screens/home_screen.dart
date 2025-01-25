@@ -80,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           circuit: race.circuit,
                           season: race.season,
                           round: race.round,
+                          hasSprint: race.hasSprint,
                         ),
                       ),
                     );
@@ -101,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   circuit: races[0].circuit,
                   season: races[0].season,
                   round: races[0].round,
+                  hasSprint: races[0].hasSprint,
                 ),
               ),
             );

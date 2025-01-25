@@ -197,27 +197,98 @@ class ApiService {
   // 5. OBTENER RESULTADOS DE APUESTAS
   // -------------------------------------------------
   /// Llama a /bets/results/?user_id=... y devuelve una lista de BetResult
-  Future<List<BetResult>> getUserBetResults(String userId) async {
+  Future<List<BetResult>> getUserBetResults() async {
     try {
-      print('Fetching results for user: $userId');
-      final response = await _authenticatedRequest(
+      final userId = await getCurrentUserId();
+      if (userId == null) {
+        throw Exception('Usuario no autenticado');
+      }
+
+      final betsResponse = await _authenticatedRequest(
         'GET',
-        '/bets/results/?user_id=$userId',
+        '/bets/',
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('Bets Response Status: ${betsResponse.statusCode}');
+      print('Bets Response Body: ${utf8.decode(betsResponse.bodyBytes)}');
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonBody = jsonDecode(response.body);
-        final List<dynamic> results = jsonBody['results'];
-        return results.map((item) => BetResult.fromJson(item)).toList();
+      if (betsResponse.statusCode == 200) {
+        final Map<String, dynamic> data =
+            jsonDecode(utf8.decode(betsResponse.bodyBytes));
+        List<BetResult> results = [];
+
+        if (data.containsKey('bets')) {
+          for (var betResult in data['bets']) {
+            print('Processing bet result: $betResult');
+            final bet = betResult['bet'];
+            final results_data = betResult['results'];
+
+            // Si no hay datos de resultados, crear BetResult con isComplete = false
+            if (results_data == null) {
+              print('No results data found, creating pending bet');
+              results.add(BetResult(
+                raceName: bet['race_name'] ?? '',
+                date: bet['date'] ?? '',
+                circuit: bet['circuit'] ?? '',
+                hasSprint: bet['has_sprint'] ?? false,
+                isComplete: false,
+                polemanUser: bet['poleman'] ?? '',
+                polemanReal: null,
+                top10User: List<String>.from(bet['top10'] ?? []),
+                top10Real: null,
+                dnfUser: bet['dnf'] ?? '',
+                dnfReal: null,
+                fastestLapUser: bet['fastest_lap'] ?? '',
+                fastestLapReal: null,
+                sprintTop10User: bet['sprint_top10'] != null
+                    ? List<String>.from(bet['sprint_top10'])
+                    : null,
+                sprintTop10Real: null,
+                points: 0,
+                pointsBreakdown: [],
+              ));
+              continue;
+            }
+
+            // Si hay resultados, procesar normalmente
+            final race = results_data['race'];
+            final comparison = results_data['comparison'];
+            final points = results_data['points'];
+
+            results.add(BetResult(
+              raceName: race['name'] ?? '',
+              date: race['date'] ?? '',
+              circuit: race['circuit'] ?? '',
+              hasSprint: race['has_sprint'] ?? false,
+              isComplete: true,
+              polemanUser: comparison['poleman_user'] ?? '',
+              polemanReal: comparison['poleman_real'],
+              top10User: List<String>.from(bet['top10'] ?? []),
+              top10Real: comparison['top10_real'] != null
+                  ? List<String>.from(comparison['top10_real'])
+                  : null,
+              dnfUser: comparison['dnf_user'] ?? '',
+              dnfReal: comparison['dnf_real'],
+              fastestLapUser: comparison['fastest_lap_user'] ?? '',
+              fastestLapReal: comparison['fastest_lap_real'],
+              sprintTop10User: bet['sprint_top10'] != null
+                  ? List<String>.from(bet['sprint_top10'])
+                  : null,
+              sprintTop10Real: null,
+              points: points['total'] ?? 0,
+              pointsBreakdown: List<String>.from(points['breakdown'] ?? []),
+            ));
+          }
+        }
+
+        return results;
       } else {
-        throw Exception('Error al obtener resultados: ${response.statusCode}');
+        throw Exception(
+            'Error al obtener apuestas: ${betsResponse.statusCode}');
       }
     } catch (e) {
       print('Error detallado: $e');
-      throw Exception('Error de conexión: $e');
+      throw Exception('Error al obtener resultados: $e');
     }
   }
 
@@ -230,48 +301,37 @@ class ApiService {
     required String raceName,
     required String date,
     required String circuit,
+    required bool hasSprint,
     required String poleman,
     required List<String> top10,
     required String dnf,
+    required String fastestLap,
+    List<String>? sprintTop10,
   }) async {
     try {
       final userId = await getCurrentUserId();
-      if (userId == null) {
-        throw Exception('Usuario no autenticado');
-      }
+      if (userId == null) throw Exception('Usuario no autenticado');
 
-      print('User ID: $userId');
-      print('Sending bet to: /bets/');
-      print('Request body: ${jsonEncode({
-            'user': userId.toString(), // Convertir a String explícitamente
-            'season': season,
-            'round': round,
-            'race_name': raceName,
-            'date': date,
-            'circuit': circuit,
-            'poleman': poleman,
-            'top10': top10,
-            'dnf': dnf,
-          })}');
+      final requestBody = {
+        'user': userId,
+        'season': season,
+        'round': round,
+        'race_name': raceName,
+        'date': date,
+        'circuit': circuit,
+        'has_sprint': hasSprint,
+        'poleman': poleman,
+        'top10': top10,
+        'dnf': dnf,
+        'fastest_lap': fastestLap,
+        if (hasSprint) 'sprint_top10': sprintTop10,
+      };
 
       final response = await _authenticatedRequest(
         'POST',
         '/bets/',
-        body: {
-          'user': userId.toString(), // Convertir a String explícitamente
-          'season': season,
-          'round': round,
-          'race_name': raceName,
-          'date': date,
-          'circuit': circuit,
-          'poleman': poleman,
-          'top10': top10,
-          'dnf': dnf,
-        },
+        body: requestBody,
       );
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
 
       if (response.statusCode == 201) {
         return true;

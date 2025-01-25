@@ -13,7 +13,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
   final ApiService apiService = ApiService();
   List<BetResult> _results = [];
   bool _isLoading = true;
-  String? _error;
 
   @override
   void initState() {
@@ -22,81 +21,62 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Future<void> _fetchResults() async {
+    setState(() => _isLoading = true);
     try {
+      final results = await apiService.getUserBetResults();
       setState(() {
-        _isLoading = true;
-        _error = null;
+        _results = results;
+        _isLoading = false;
       });
-
-      final userId = await apiService.getCurrentUserId();
-      if (userId == null) throw Exception('Usuario no autenticado');
-      final fetchedResults = await apiService.getUserBetResults(userId);
-
-      if (mounted) {
-        setState(() {
-          _results = fetchedResults;
-          _isLoading = false;
-        });
-      }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar resultados: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color.fromARGB(255, 255, 17, 0),
-          ),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Mis Resultados'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Error: $_error',
-                style: const TextStyle(color: Colors.red),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _fetchResults,
-                child: const Text('Reintentar'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Resultados'),
+        title: const Text('Resultados'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchResults,
+          ),
+        ],
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _results.length,
-        itemBuilder: (context, index) => _buildResultItem(_results[index]),
-      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 255, 17, 0),
+              ),
+            )
+          : _results.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No hay resultados disponibles',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _results.length,
+                  itemBuilder: (context, index) {
+                    final betRes = _results[index];
+                    return _buildBetResultCard(betRes);
+                  },
+                ),
     );
   }
 
-  Widget _buildResultItem(BetResult betRes) {
+  Widget _buildBetResultCard(BetResult betRes) {
     return Card(
       color: Colors.grey[900],
       margin: const EdgeInsets.only(bottom: 16),
@@ -128,7 +108,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
                     child: const Text(
                       'Pendiente',
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Color.fromARGB(255, 234, 198, 16),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -173,15 +153,23 @@ class _ResultsScreenState extends State<ResultsScreen> {
             if (betRes.isComplete && betRes.dnfReal != null)
               _buildDnfComparison(betRes.dnfUser, betRes.dnfReal!)
             else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: betRes.dnfUser
-                    .map((pilot) => Text(
-                          pilot,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 16),
-                        ))
-                    .toList(),
+              Text(
+                betRes.dnfUser,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+
+            const SizedBox(height: 12),
+
+            // FASTEST LAP
+            _buildSectionTitle('Tu Apuesta de Vuelta Rápida'),
+            const SizedBox(height: 8),
+            if (betRes.isComplete && betRes.fastestLapReal != null)
+              _buildFastestLapComparison(
+                  betRes.fastestLapUser, betRes.fastestLapReal!)
+            else
+              Text(
+                betRes.fastestLapUser,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
 
             if (betRes.isComplete) ...[
@@ -191,7 +179,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
               _buildSectionTitle('Puntaje Obtenido'),
               Text(
                 'Puntos en esta carrera: ${betRes.points ?? 0}',
-                style: const TextStyle(color: Colors.white, fontSize: 20),
+                style: const TextStyle(
+                  color: Colors.amber,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (betRes.pointsBreakdown.isNotEmpty) ...[
                 const SizedBox(height: 10),
@@ -205,8 +197,11 @@ class _ResultsScreenState extends State<ResultsScreen> {
                 ),
                 ...betRes.pointsBreakdown.map((line) => Text(
                       '- $line',
-                      style:
-                          const TextStyle(color: Colors.white70, fontSize: 14),
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     )),
               ],
             ],
@@ -242,11 +237,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
   }
 
   Widget _buildTop10Comparison(List<String> userTop10, List<String> realTop10) {
-    // Ejemplo: una columna con 2 secciones: "Tu predicción" vs "Resultado final".
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Predicción
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,30 +249,30 @@ class _ResultsScreenState extends State<ResultsScreen> {
               ...userTop10.asMap().entries.map((entry) {
                 final index = entry.key;
                 final pilot = entry.value;
+                final correct =
+                    index < realTop10.length && pilot == realTop10[index];
                 return Text(
                   '${index + 1}. $pilot',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: TextStyle(
+                    color: correct ? Colors.green : Colors.red,
+                    fontSize: 16,
+                  ),
                 );
               }),
             ],
           ),
         ),
         const SizedBox(width: 20),
-        // Resultado real
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Real:',
                   style: TextStyle(color: Colors.white70, fontSize: 14)),
-              ...realTop10.asMap().entries.map((entry) {
-                final index = entry.key;
-                final pilot = entry.value;
-                return Text(
-                  '${index + 1}. $pilot',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                );
-              }),
+              ...realTop10.asMap().entries.map((entry) => Text(
+                    '${entry.key + 1}. ${entry.value}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  )),
             ],
           ),
         ),
@@ -287,55 +280,78 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
-  Widget _buildDnfComparison(List<String> userDnf, List<String> realDnf) {
-    if (realDnf.isEmpty && userDnf.isEmpty) {
-      return const Text('No hubo DNFs',
-          style: TextStyle(color: Colors.white, fontSize: 16));
-    }
-
+  Widget _buildDnfComparison(String userDnf, String realDnf) {
+    final correct = userDnf == realDnf;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Apostado
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Apostado:',
                   style: TextStyle(color: Colors.white70, fontSize: 14)),
-              userDnf.isNotEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: userDnf
-                          .map((pilot) => Text(pilot,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 16)))
-                          .toList(),
-                    )
-                  : const Text('Ningún DNF apostado',
-                      style: TextStyle(color: Colors.white54)),
+              Text(
+                userDnf,
+                style: TextStyle(
+                  color: correct ? Colors.green : Colors.red,
+                  fontSize: 16,
+                ),
+              ),
             ],
           ),
         ),
         const SizedBox(width: 20),
-        // Real
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Real:',
                   style: TextStyle(color: Colors.white70, fontSize: 14)),
-              realDnf.isNotEmpty
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: realDnf
-                          .map((pilot) => Text(pilot,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 16)))
-                          .toList(),
-                    )
-                  : const Text('Nadie abandonó',
-                      style: TextStyle(color: Colors.white54)),
+              Text(
+                realDnf,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFastestLapComparison(
+      String userFastestLap, String realFastestLap) {
+    final correct = userFastestLap == realFastestLap;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Apostado:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text(
+                userFastestLap,
+                style: TextStyle(
+                  color: correct ? Colors.green : Colors.red,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Real:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text(
+                realFastestLap,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
             ],
           ),
         ),

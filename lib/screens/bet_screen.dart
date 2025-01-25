@@ -8,6 +8,7 @@ class BetScreen extends StatefulWidget {
   final String circuit;
   final String season;
   final String round;
+  final bool hasSprint;
 
   const BetScreen({
     Key? key,
@@ -16,6 +17,7 @@ class BetScreen extends StatefulWidget {
     required this.circuit,
     required this.season,
     required this.round,
+    required this.hasSprint,
   }) : super(key: key);
 
   @override
@@ -29,6 +31,8 @@ class _BetScreenState extends State<BetScreen> {
   String _selectedPoleman = '';
   List<String> _top10 = List.filled(10, '');
   String _selectedDnf = '';
+  String _selectedFastestLap = '';
+  List<String> _sprintTop8 = List.filled(8, '');
 
   @override
   void initState() {
@@ -143,153 +147,56 @@ class _BetScreenState extends State<BetScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            // Pole Position
-            const Text(
-              'Pole Position',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedPoleman.isEmpty ? null : _selectedPoleman,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+
+            // Sprint Race (si aplica)
+            if (widget.hasSprint) ...[
+              _buildSectionTitle('Sprint Race - Top 8'),
+              const SizedBox(height: 10),
+              for (int i = 0; i < 8; i++)
+                _buildPositionSelector(
+                  'P${i + 1}',
+                  _sprintTop8[i],
+                  (value) {
+                    setState(() => _sprintTop8[i] = value ?? '');
+                  },
                 ),
-              ),
-              dropdownColor: Colors.grey[800],
-              style: const TextStyle(color: Colors.white),
-              hint: const Text('Selecciona un piloto',
-                  style: TextStyle(color: Colors.white70)),
-              items: _pilotos.map((String pilot) {
-                return DropdownMenuItem<String>(
-                  value: pilot,
-                  child: Text(pilot),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedPoleman = newValue ?? '';
-                });
-              },
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              const Divider(color: Colors.white24),
+              const SizedBox(height: 20),
+            ],
 
-            // Top 10
-            const Text(
-              'Top 10',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            // Carrera Principal
+            _buildSectionTitle('Pole Position'),
+            _buildDriverSelector(
+              _selectedPoleman,
+              (value) => setState(() => _selectedPoleman = value ?? ''),
             ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: 10,
-              itemBuilder: (context, index) {
-                // Obtener pilotos disponibles para esta posición
-                final availablePilots = _getAvailablePilots(index);
+            const SizedBox(height: 20),
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
-                    children: [
-                      Text(
-                        '${index + 1}.',
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _top10[index].isEmpty ? null : _top10[index],
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.grey[800],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                          dropdownColor: Colors.grey[800],
-                          style: const TextStyle(color: Colors.white),
-                          hint: Text('Posición ${index + 1}',
-                              style: const TextStyle(color: Colors.white70)),
-                          items: [
-                            if (_top10[index].isNotEmpty)
-                              DropdownMenuItem<String>(
-                                value: _top10[index],
-                                child: Text(_top10[index]),
-                              ),
-                            ...availablePilots
-                                .where((pilot) => pilot != _top10[index])
-                                .map((String pilot) {
-                              return DropdownMenuItem<String>(
-                                value: pilot,
-                                child: Text(pilot),
-                              );
-                            }),
-                          ],
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _top10[index] = newValue ?? '';
-                            });
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 24),
+            _buildSectionTitle('Top 10 Carrera'),
+            for (int i = 0; i < 10; i++)
+              _buildPositionSelector(
+                'P${i + 1}',
+                _top10[i],
+                (value) {
+                  setState(() => _top10[i] = value ?? '');
+                },
+              ),
+            const SizedBox(height: 20),
 
-            // DNF
-            const Text(
-              'DNF',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            _buildSectionTitle('Vuelta Rápida'),
+            _buildDriverSelector(
+              _selectedFastestLap,
+              (value) => setState(() => _selectedFastestLap = value ?? ''),
             ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedDnf.isEmpty ? null : _selectedDnf,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.grey[800],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              dropdownColor: Colors.grey[800],
-              style: const TextStyle(color: Colors.white),
-              hint: const Text('Selecciona un piloto',
-                  style: TextStyle(color: Colors.white70)),
-              items: _pilotos.map((String pilot) {
-                return DropdownMenuItem<String>(
-                  value: pilot,
-                  child: Text(pilot),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedDnf = newValue ?? '';
-                });
-              },
+            const SizedBox(height: 20),
+
+            _buildSectionTitle('DNF'),
+            _buildDriverSelector(
+              _selectedDnf,
+              (value) => setState(() => _selectedDnf = value ?? ''),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 30),
 
             // Botón de enviar
             SizedBox(
@@ -334,8 +241,18 @@ class _BetScreenState extends State<BetScreen> {
           const Color.fromARGB(255, 255, 17, 0), Icons.close);
       return;
     }
+    if (_selectedFastestLap.isEmpty) {
+      _showDialog('Por favor, selecciona un piloto para la vuelta rápida.',
+          const Color.fromARGB(255, 255, 17, 0), Icons.close);
+      return;
+    }
     if (_selectedDnf.isEmpty) {
       _showDialog('Por favor, selecciona un piloto como DNF.',
+          const Color.fromARGB(255, 255, 17, 0), Icons.close);
+      return;
+    }
+    if (widget.hasSprint && _sprintTop8.contains('')) {
+      _showDialog('Completa todas las posiciones del Sprint Top 8.',
           const Color.fromARGB(255, 255, 17, 0), Icons.close);
       return;
     }
@@ -347,9 +264,12 @@ class _BetScreenState extends State<BetScreen> {
         raceName: widget.raceName,
         date: widget.date,
         circuit: widget.circuit,
+        hasSprint: widget.hasSprint,
         poleman: _selectedPoleman,
         top10: _top10,
         dnf: _selectedDnf,
+        fastestLap: _selectedFastestLap,
+        sprintTop10: widget.hasSprint ? _sprintTop8 : null,
       );
 
       if (success && mounted) {
@@ -392,6 +312,93 @@ class _BetScreenState extends State<BetScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildDriverSelector(
+      String selectedValue, Function(String?) onChanged) {
+    return DropdownButtonFormField<String>(
+      value: selectedValue.isEmpty ? null : selectedValue,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.grey[800],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      dropdownColor: Colors.grey[800],
+      style: const TextStyle(color: Colors.white),
+      hint: const Text('Selecciona un piloto',
+          style: TextStyle(color: Colors.white70)),
+      items: _pilotos.map((String pilot) {
+        return DropdownMenuItem<String>(
+          value: pilot,
+          child: Text(pilot),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildPositionSelector(
+      String label, String selectedValue, Function(String?) onChanged) {
+    final availablePilots =
+        _getAvailablePilots(int.parse(label.substring(1)) - 1);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<String>(
+              value: selectedValue.isEmpty ? null : selectedValue,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.grey[800],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              dropdownColor: Colors.grey[800],
+              style: const TextStyle(color: Colors.white),
+              hint: Text(label, style: const TextStyle(color: Colors.white70)),
+              items: [
+                if (selectedValue.isNotEmpty)
+                  DropdownMenuItem<String>(
+                    value: selectedValue,
+                    child: Text(selectedValue),
+                  ),
+                ...availablePilots
+                    .where((pilot) => pilot != selectedValue)
+                    .map((String pilot) {
+                  return DropdownMenuItem<String>(
+                    value: pilot,
+                    child: Text(pilot),
+                  );
+                }),
+              ],
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

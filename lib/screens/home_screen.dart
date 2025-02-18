@@ -4,6 +4,8 @@ import '../services/api_service.dart';
 import '../models/race.dart';
 import '../widgets/race_card.dart';
 import '../screens/bet_screen.dart';
+import '../screens/results_screen.dart';
+import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -48,11 +50,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<bool> _checkExistingPrediction(String season, String round) async {
+    int retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        final results = await apiService.getUserBetResults();
+        return results
+            .any((result) => result.season == season && result.round == round);
+      } catch (e) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          // Esperar antes de reintentar
+          await Future.delayed(Duration(seconds: 1));
+        }
+      }
+    }
+
+    // Si todos los intentos fallan, asumimos que no hay predicción
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentYear = DateTime.now().year.toString();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Próximas Carreras'),
+        title: Text('Carreras $currentYear'),
         automaticallyImplyLeading: false,
       ),
       body: _loading
@@ -64,61 +90,57 @@ class _HomeScreenState extends State<HomeScreen> {
               itemCount: races.length,
               itemBuilder: (context, index) {
                 final race = races[index];
-                return RaceCard(
-                  raceName: race.name,
-                  date: race.date,
-                  circuit: race.circuit,
-                  season: race.season,
-                  round: race.round,
-                  onBetPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BetScreen(
-                          raceName: race.name,
-                          date: race.date,
-                          circuit: race.circuit,
-                          season: race.season,
-                          round: race.round,
-                          hasSprint: race.hasSprint,
-                        ),
-                      ),
+                return FutureBuilder<bool>(
+                  future: _checkExistingPrediction(race.season, race.round),
+                  builder: (context, snapshot) {
+                    final hasPrediction = snapshot.data ?? false;
+                    final raceDate = DateTime.parse(race.date);
+                    final raceCompleted = raceDate.isBefore(DateTime.now());
+
+                    return RaceCard(
+                      raceName: race.name,
+                      date: race.date,
+                      circuit: race.circuit,
+                      season: race.season,
+                      round: race.round,
+                      hasPrediction: hasPrediction,
+                      raceCompleted: raceCompleted,
+                      onBetPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BetScreen(
+                              raceName: race.name,
+                              date: race.date,
+                              circuit: race.circuit,
+                              season: race.season,
+                              round: race.round,
+                              hasSprint: race.hasSprint,
+                            ),
+                          ),
+                        );
+                      },
+                      onViewResults: (season, round) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ResultsScreen(
+                              initialRaceId: '${season}_$round',
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        shape: const CircleBorder(),
-        foregroundColor: Colors.white,
-        onPressed: () {
-          if (races.isNotEmpty) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BetScreen(
-                  raceName: races[0].name,
-                  date: races[0].date,
-                  circuit: races[0].circuit,
-                  season: races[0].season,
-                  round: races[0].round,
-                  hasSprint: races[0].hasSprint,
-                ),
-              ),
-            );
-          }
-        },
-        backgroundColor: const Color.fromARGB(255, 255, 17, 0),
-        child: const Icon(CupertinoIcons.car_fill),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
         shadowColor: Colors.transparent,
         color: Colors.grey[900],
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             IconButton(
               icon: const Icon(CupertinoIcons.home, color: Colors.white),
@@ -126,7 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() {
                   _selectedIndex = 0;
                 });
-                // Navegación a Inicio
               },
             ),
             IconButton(
@@ -138,14 +159,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pushNamed(context, '/results');
               },
             ),
-            const SizedBox(width: 40), // Espacio para el FloatingActionButton
-
             IconButton(
               icon:
                   const Icon(CupertinoIcons.person_3_fill, color: Colors.white),
               onPressed: () {
                 setState(() {
-                  _selectedIndex = 3;
+                  _selectedIndex = 2;
                 });
                 Navigator.pushNamed(context, '/tournaments');
               },
@@ -155,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.white),
               onPressed: () {
                 setState(() {
-                  _selectedIndex = 2;
+                  _selectedIndex = 3;
                 });
                 Navigator.pushNamed(context, '/profile');
               },

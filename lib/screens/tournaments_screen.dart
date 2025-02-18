@@ -162,7 +162,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                         backgroundColor: const Color.fromARGB(255, 255, 17, 0),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Crear Torneo'),
+                      child: const Text('Crear Torneo',
+                          style: TextStyle(color: Colors.white)),
                     ),
                   ),
 
@@ -202,7 +203,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                         backgroundColor: const Color.fromARGB(255, 255, 17, 0),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text('Unirse a Torneo'),
+                      child: const Text('Unirse a Torneo',
+                          style: TextStyle(color: Colors.white)),
                     ),
                   ),
 

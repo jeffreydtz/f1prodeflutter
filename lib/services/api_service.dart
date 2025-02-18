@@ -67,7 +67,6 @@ class ApiService {
       }
       return false;
     } catch (e) {
-      print('Error refreshing token: $e');
       return false;
     }
   }
@@ -93,7 +92,6 @@ class ApiService {
 
       return response.statusCode == 201;
     } catch (e) {
-      print('Error en registro: $e');
       return false;
     }
   }
@@ -132,7 +130,6 @@ class ApiService {
       }
       return false;
     } catch (e) {
-      print('Error en login: $e');
       return false;
     }
   }
@@ -149,15 +146,13 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            jsonDecode(utf8.decode(response.bodyBytes));
         return jsonList.map((raceJson) => Race.fromJson(raceJson)).toList();
       } else {
-        print('Error status: ${response.statusCode}');
-        print('Error body: ${response.body}');
         throw Exception('Error al obtener carreras: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error detallado: $e');
       throw Exception('Error de conexión: $e');
     }
   }
@@ -174,8 +169,9 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        // Decodificar la respuesta como una lista de strings directamente
-        final List<dynamic> driversList = jsonDecode(response.body);
+        // Decodificar la respuesta usando UTF-8
+        final List<dynamic> driversList =
+            jsonDecode(utf8.decode(response.bodyBytes));
 
         // Convertir cada elemento a String
         final List<String> pilotNames =
@@ -183,12 +179,9 @@ class ApiService {
 
         return pilotNames;
       } else {
-        print('Error status: ${response.statusCode}');
-        print('Error body: ${response.body}');
         throw Exception('Error al obtener drivers: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error detallado: $e');
       throw Exception('Error de conexión (drivers): $e');
     }
   }
@@ -199,96 +192,53 @@ class ApiService {
   /// Llama a /bets/results/?user_id=... y devuelve una lista de BetResult
   Future<List<BetResult>> getUserBetResults() async {
     try {
-      final userId = await getCurrentUserId();
-      if (userId == null) {
-        throw Exception('Usuario no autenticado');
-      }
+      final response = await _authenticatedRequest('GET', '/bets/');
 
-      final betsResponse = await _authenticatedRequest(
-        'GET',
-        '/bets/',
-      );
-
-      print('Bets Response Status: ${betsResponse.statusCode}');
-      print('Bets Response Body: ${utf8.decode(betsResponse.bodyBytes)}');
-
-      if (betsResponse.statusCode == 200) {
+      if (response.statusCode == 200) {
         final Map<String, dynamic> data =
-            jsonDecode(utf8.decode(betsResponse.bodyBytes));
-        List<BetResult> results = [];
+            jsonDecode(utf8.decode(response.bodyBytes));
+        final List<dynamic> bets = data['bets'] ?? [];
 
-        if (data.containsKey('bets')) {
-          for (var betResult in data['bets']) {
-            print('Processing bet result: $betResult');
-            final bet = betResult['bet'];
-            final results_data = betResult['results'];
+        return bets.map((betData) {
+          final bet = betData['bet'];
+          final results = betData['results'];
 
-            // Si no hay datos de resultados, crear BetResult con isComplete = false
-            if (results_data == null) {
-              print('No results data found, creating pending bet');
-              results.add(BetResult(
-                raceName: bet['race_name'] ?? '',
-                date: bet['date'] ?? '',
-                circuit: bet['circuit'] ?? '',
-                hasSprint: bet['has_sprint'] ?? false,
-                isComplete: false,
-                polemanUser: bet['poleman'] ?? '',
-                polemanReal: null,
-                top10User: List<String>.from(bet['top10'] ?? []),
-                top10Real: null,
-                dnfUser: bet['dnf'] ?? '',
-                dnfReal: null,
-                fastestLapUser: bet['fastest_lap'] ?? '',
-                fastestLapReal: null,
-                sprintTop10User: bet['sprint_top10'] != null
-                    ? List<String>.from(bet['sprint_top10'])
-                    : null,
-                sprintTop10Real: null,
-                points: 0,
-                pointsBreakdown: [],
-              ));
-              continue;
-            }
-
-            // Si hay resultados, procesar normalmente
-            final race = results_data['race'];
-            final comparison = results_data['comparison'];
-            final points = results_data['points'];
-
-            results.add(BetResult(
-              raceName: race['name'] ?? '',
-              date: race['date'] ?? '',
-              circuit: race['circuit'] ?? '',
-              hasSprint: race['has_sprint'] ?? false,
-              isComplete: true,
-              polemanUser: comparison['poleman_user'] ?? '',
-              polemanReal: comparison['poleman_real'],
-              top10User: List<String>.from(bet['top10'] ?? []),
-              top10Real: comparison['top10_real'] != null
-                  ? List<String>.from(comparison['top10_real'])
-                  : null,
-              dnfUser: comparison['dnf_user'] ?? '',
-              dnfReal: comparison['dnf_real'],
-              fastestLapUser: comparison['fastest_lap_user'] ?? '',
-              fastestLapReal: comparison['fastest_lap_real'],
-              sprintTop10User: bet['sprint_top10'] != null
-                  ? List<String>.from(bet['sprint_top10'])
-                  : null,
-              sprintTop10Real: null,
-              points: points['total'] ?? 0,
-              pointsBreakdown: List<String>.from(points['breakdown'] ?? []),
-            ));
-          }
-        }
-
-        return results;
+          return BetResult(
+            raceName: bet['race_name'] ?? '',
+            date: bet['date'] ?? '',
+            circuit: bet['circuit'] ?? '',
+            hasSprint: bet['has_sprint'] ?? false,
+            season: bet['season'] ?? '',
+            round: bet['round'] ?? '',
+            isComplete: bet['is_complete'] ?? false,
+            polemanUser: bet['poleman'] ?? '',
+            polemanReal: results?['comparison']?['poleman_real'],
+            top10User: List<String>.from(bet['top10'] ?? []),
+            top10Real: results?['comparison']?['top10_real'] != null
+                ? List<String>.from(results['comparison']['top10_real'])
+                : null,
+            dnfUser: bet['dnf'] ?? '',
+            dnfReal: results?['comparison']?['dnf_real'],
+            fastestLapUser: bet['fastest_lap'] ?? '',
+            fastestLapReal: results?['comparison']?['fastest_lap_real'],
+            sprintTop10User: bet['sprint_top10'] != null
+                ? List<String>.from(bet['sprint_top10'])
+                : null,
+            sprintTop10Real: results?['comparison']?['sprint_top10_real'] !=
+                    null
+                ? List<String>.from(results['comparison']['sprint_top10_real'])
+                : null,
+            points: results?['points']?['total'] ?? bet['points'] ?? 0,
+            pointsBreakdown: results?['points']?['breakdown'] != null
+                ? List<String>.from(results['points']['breakdown'])
+                : [],
+          );
+        }).toList();
       } else {
-        throw Exception(
-            'Error al obtener apuestas: ${betsResponse.statusCode}');
+        throw Exception('Error al obtener apuestas: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error detallado: $e');
-      throw Exception('Error al obtener resultados: $e');
+      throw Exception('Error de conexión: $e');
     }
   }
 
@@ -340,7 +290,6 @@ class ApiService {
         throw Exception('Error al crear apuesta: $error');
       }
     } catch (e) {
-      print('Error detallado: $e');
       throw Exception('Error de conexión: $e');
     }
   }
@@ -352,28 +301,21 @@ class ApiService {
         '/tournaments/',
       );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
         final tournaments = jsonList.map((json) {
           try {
             return Tournament.fromJson(json);
           } catch (e) {
-            print('Error parsing tournament: $e');
-            print('JSON data: $json');
             rethrow;
           }
         }).toList();
 
-        print('Parsed tournaments: ${tournaments.length}');
         return tournaments;
       } else {
         throw Exception('Error al obtener torneos: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error in getTournaments: $e');
       throw Exception('Error de conexión: $e');
     }
   }
@@ -492,12 +434,9 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_id');
-      if (userId == null) {
-        print('No se encontró ID de usuario en SharedPreferences');
-      }
+      if (userId == null) {}
       return userId;
     } catch (e) {
-      print('Error al obtener ID de usuario: $e');
       return null;
     }
   }

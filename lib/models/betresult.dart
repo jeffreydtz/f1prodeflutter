@@ -3,7 +3,9 @@ class BetResult {
   final String date;
   final String circuit;
   final bool hasSprint;
-  bool isComplete;
+  final String season;
+  final String round;
+  final bool isComplete;
 
   // Main Race
   final String polemanUser;
@@ -28,7 +30,9 @@ class BetResult {
     required this.date,
     required this.circuit,
     required this.hasSprint,
-    this.isComplete = false,
+    required this.season,
+    required this.round,
+    required this.isComplete,
     required this.polemanUser,
     this.polemanReal,
     required this.top10User,
@@ -44,34 +48,47 @@ class BetResult {
   });
 
   factory BetResult.fromJson(Map<String, dynamic> json) {
-    final raceData = json['race'] as Map<String, dynamic>;
-    final betData = json['bet'] as Map<String, dynamic>;
-    final pointsData = json['points'] as Map<String, dynamic>;
+    final bet = json['bet'] as Map<String, dynamic>;
+    final results = json['results'] as Map<String, dynamic>?;
+    final comparison = results?['comparison'] as Map<String, dynamic>?;
+    final pointsData = results?['points'] as Map<String, dynamic>?;
+
+    List<String> parseStringList(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((item) => item.toString()).toList();
+      }
+      return [];
+    }
 
     return BetResult(
-      raceName: raceData['name'] ?? '',
-      date: raceData['date'] ?? '',
-      circuit: raceData['circuit'] ?? '',
-      hasSprint: raceData['has_sprint'] ?? false,
-      isComplete: true,
-      polemanUser: betData['poleman_user'] ?? '',
-      polemanReal: betData['poleman_real'],
-      top10User: List<String>.from(betData['top10_user'] ?? []),
-      top10Real: betData['top10_real'] != null
-          ? List<String>.from(betData['top10_real'])
+      raceName: bet['race_name']?.toString() ?? '',
+      date: bet['date']?.toString() ?? '',
+      circuit: bet['circuit']?.toString() ?? '',
+      hasSprint: bet['has_sprint'] as bool? ?? false,
+      season: bet['season']?.toString() ?? '',
+      round: bet['round']?.toString() ?? '',
+      isComplete: bet['is_complete'] as bool? ?? false,
+      polemanUser: bet['poleman']?.toString() ?? '',
+      polemanReal: comparison?['poleman_real']?.toString(),
+      top10User: parseStringList(bet['top10']),
+      top10Real: comparison?['top10_real'] != null
+          ? parseStringList(comparison?['top10_real'])
           : null,
-      dnfUser: betData['dnf_user'] ?? '',
-      dnfReal: betData['dnf_real'],
-      fastestLapUser: betData['fastest_lap_user'] ?? '',
-      fastestLapReal: betData['fastest_lap_real'],
-      sprintTop10User: betData['sprint_top10_user'] != null
-          ? List<String>.from(betData['sprint_top10_user'])
+      dnfUser: bet['dnf']?.toString() ?? '',
+      dnfReal: comparison?['dnf_real']?.toString(),
+      fastestLapUser: bet['fastest_lap']?.toString() ?? '',
+      fastestLapReal: comparison?['fastest_lap_real']?.toString(),
+      sprintTop10User: bet['sprint_top10'] != null
+          ? parseStringList(bet['sprint_top10'])
           : null,
-      sprintTop10Real: betData['sprint_top10_real'] != null
-          ? List<String>.from(betData['sprint_top10_real'])
+      sprintTop10Real: comparison?['sprint_top10_real'] != null
+          ? parseStringList(comparison?['sprint_top10_real'])
           : null,
-      points: pointsData['total'] ?? 0,
-      pointsBreakdown: List<String>.from(pointsData['breakdown'] ?? []),
+      points: (pointsData?['total'] ?? bet['points'] ?? 0) as int,
+      pointsBreakdown: pointsData?['breakdown'] != null
+          ? parseStringList(pointsData?['breakdown'])
+          : [],
     );
   }
 }

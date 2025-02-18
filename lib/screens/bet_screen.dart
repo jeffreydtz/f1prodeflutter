@@ -84,7 +84,7 @@ class _BetScreenState extends State<BetScreen> {
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Nueva Apuesta'),
+          title: const Text('Nueva Prediccion'),
         ),
         body: const Center(
           child: Column(
@@ -110,15 +110,19 @@ class _BetScreenState extends State<BetScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nueva Apuesta'),
+        title: const Text('Nueva Prediccion'),
+        centerTitle: true,
+        leadingWidth: 40,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Información de la carrera
             Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 0),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.grey[850],
@@ -211,8 +215,9 @@ class _BetScreenState extends State<BetScreen> {
                 ),
                 onPressed: _confirmBet,
                 child: const Text(
-                  'Enviar Apuesta',
+                  'Enviar Prediccion',
                   style: TextStyle(
+                    color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -273,15 +278,15 @@ class _BetScreenState extends State<BetScreen> {
       );
 
       if (success && mounted) {
-        await _showDialog(
-            'Apuesta confirmada con éxito.', Colors.green, Icons.check_circle);
+        await _showDialog('Predicción confirmada con éxito.', Colors.green,
+            Icons.check_circle);
         if (mounted) {
           Navigator.of(context).pop();
         }
       }
     } catch (e) {
       if (mounted) {
-        _showDialog('Error al enviar la apuesta: ${e.toString()}',
+        _showDialog('Error al enviar la predicción: ${e.toString()}',
             const Color.fromARGB(255, 255, 17, 0), Icons.error);
       }
     }

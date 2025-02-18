@@ -7,6 +7,9 @@ class RaceCard extends StatelessWidget {
   final String season;
   final String round;
   final VoidCallback onBetPressed;
+  final Function(String, String) onViewResults;
+  final bool hasPrediction;
+  final bool raceCompleted;
 
   const RaceCard({
     Key? key,
@@ -16,6 +19,9 @@ class RaceCard extends StatelessWidget {
     required this.season,
     required this.round,
     required this.onBetPressed,
+    required this.onViewResults,
+    this.hasPrediction = false,
+    this.raceCompleted = false,
   }) : super(key: key);
 
   @override
@@ -33,16 +39,35 @@ class RaceCard extends StatelessWidget {
           '$date - $circuit',
           style: const TextStyle(color: Colors.white54),
         ),
-        trailing: ElevatedButton(
-          onPressed: onBetPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 255, 20, 3),
-          ),
-          child: const Text(
-            'Apostar',
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
+        trailing: (hasPrediction || raceCompleted)
+            ? ElevatedButton(
+                onPressed: () => onViewResults(season, round),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                ),
+                child: const Text(
+                  'Ver Resultados',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            : ElevatedButton(
+                onPressed: onBetPressed,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 255, 20, 3),
+                ),
+                child: const Text(
+                  'Predecir',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
       ),
     );
   }

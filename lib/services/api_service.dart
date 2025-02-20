@@ -17,7 +17,8 @@ class ApiService {
 
   /// Ajusta la URL base de tu backend Django.
   /// Usa "10.0.2.2" si corres la app en un emulador Android local.
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl =
+      'https://f1prodedjango-production.up.railway.app/api';
 
   /// Variable para almacenar el usuario logueado
   UserModel? currentUser;

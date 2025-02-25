@@ -48,18 +48,18 @@ class BetResult {
   });
 
   factory BetResult.fromJson(Map<String, dynamic> json) {
-    final bet = json['bet'] as Map<String, dynamic>;
-    final results = json['results'] as Map<String, dynamic>?;
-    final comparison = results?['comparison'] as Map<String, dynamic>?;
-    final pointsData = results?['points'] as Map<String, dynamic>?;
-
     List<String> parseStringList(dynamic value) {
       if (value == null) return [];
       if (value is List) {
-        return value.map((item) => item.toString()).toList();
+        return value.map((item) => item?.toString() ?? '').toList();
       }
       return [];
     }
+
+    final bet = json['bet'] as Map<String, dynamic>? ?? {};
+    final results = json['results'] as Map<String, dynamic>?;
+    final comparison = results?['comparison'] as Map<String, dynamic>?;
+    final pointsData = results?['points'] as Map<String, dynamic>?;
 
     return BetResult(
       raceName: bet['race_name']?.toString() ?? '',
@@ -73,7 +73,7 @@ class BetResult {
       polemanReal: comparison?['poleman_real']?.toString(),
       top10User: parseStringList(bet['top10']),
       top10Real: comparison?['top10_real'] != null
-          ? parseStringList(comparison?['top10_real'])
+          ? parseStringList(comparison['top10_real'])
           : null,
       dnfUser: bet['dnf']?.toString() ?? '',
       dnfReal: comparison?['dnf_real']?.toString(),
@@ -83,11 +83,11 @@ class BetResult {
           ? parseStringList(bet['sprint_top10'])
           : null,
       sprintTop10Real: comparison?['sprint_top10_real'] != null
-          ? parseStringList(comparison?['sprint_top10_real'])
+          ? parseStringList(comparison['sprint_top10_real'])
           : null,
       points: (pointsData?['total'] ?? bet['points'] ?? 0) as int,
       pointsBreakdown: pointsData?['breakdown'] != null
-          ? parseStringList(pointsData?['breakdown'])
+          ? parseStringList(pointsData['breakdown'])
           : [],
     );
   }

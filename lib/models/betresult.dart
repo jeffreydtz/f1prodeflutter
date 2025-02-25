@@ -72,7 +72,7 @@ class BetResult {
       polemanUser: bet['poleman']?.toString() ?? '',
       polemanReal: comparison?['poleman_real']?.toString(),
       top10User: parseStringList(bet['top10']),
-      top10Real: comparison?['top10_real'] != null
+      top10Real: comparison != null && comparison['top10_real'] != null
           ? parseStringList(comparison['top10_real'])
           : null,
       dnfUser: bet['dnf']?.toString() ?? '',
@@ -82,11 +82,12 @@ class BetResult {
       sprintTop10User: bet['sprint_top10'] != null
           ? parseStringList(bet['sprint_top10'])
           : null,
-      sprintTop10Real: comparison?['sprint_top10_real'] != null
-          ? parseStringList(comparison['sprint_top10_real'])
-          : null,
+      sprintTop10Real:
+          comparison != null && comparison['sprint_top10_real'] != null
+              ? parseStringList(comparison['sprint_top10_real'])
+              : null,
       points: (pointsData?['total'] ?? bet['points'] ?? 0) as int,
-      pointsBreakdown: pointsData?['breakdown'] != null
+      pointsBreakdown: pointsData != null && pointsData['breakdown'] != null
           ? parseStringList(pointsData['breakdown'])
           : [],
     );

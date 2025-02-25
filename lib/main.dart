@@ -5,8 +5,12 @@ import 'screens/bet_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/tournaments_screen.dart';
 import 'screens/profile_screen.dart';
+import 'utils/logger.dart';
 
 void main() {
+  // Asegurarse de que los logs estén habilitados desde el inicio
+  Logger.enableLogs();
+  Logger.info('Iniciando aplicación F1 Prode');
   runApp(const F1BettingApp());
 }
 

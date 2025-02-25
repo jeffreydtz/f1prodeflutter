@@ -24,8 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserProfile() async {
-    print('ProfileScreen: Iniciando carga de perfil');
-
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -34,19 +32,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     try {
-      print('ProfileScreen: Intentando cargar perfil de usuario');
       final ApiService apiService = ApiService();
 
       // Verificar si hay un usuario actual
-      if (apiService.currentUser != null) {
-        print(
-            'ProfileScreen: Usuario actual encontrado: ${apiService.currentUser!.username}');
-      } else {
-        print('ProfileScreen: No hay usuario actual');
-      }
+      _currentUser = apiService.getCurrentUser();
 
       final userData = await apiService.getUserProfile();
-      print('ProfileScreen: Perfil cargado desde el servidor');
 
       if (mounted) {
         setState(() {
@@ -58,16 +49,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final email = _userData?['email'] ?? 'No disponible';
           final points = _userData?['total_points']?.toString() ?? '0';
 
-          print(
-              'ProfileScreen: Mostrando perfil - Usuario: $username, Email: $email, Puntos: $points');
+          // Si el usuario actual tiene un nombre genérico pero tenemos datos reales, actualizarlo
+          if (_currentUser != null &&
+              _currentUser!.username == 'Usuario' &&
+              username != 'Usuario') {
+            _currentUser = UserModel(
+              id: _currentUser!.id,
+              username: username,
+              email: email,
+              password: '',
+              points: int.tryParse(points) ?? 0,
+            );
+
+            // Actualizar también el usuario en el ApiService
+            apiService.currentUser = _currentUser;
+          }
         });
       }
     } catch (e) {
-      print('ProfileScreen: Error al cargar perfil: $e');
       if (mounted) {
         setState(() {
-          _error = 'Error al cargar el perfil: ${e.toString()}';
+          // Proporcionar un mensaje de error más amigable
+          String errorMsg = 'Error al cargar el perfil';
+
+          if (e.toString().contains('404')) {
+            errorMsg =
+                'No se encontró el perfil. El servidor puede estar en mantenimiento.';
+          } else if (e.toString().contains('HTML')) {
+            errorMsg =
+                'El servidor respondió con un formato incorrecto. Intente más tarde.';
+          } else if (e.toString().contains('conexión')) {
+            errorMsg = 'Error de conexión. Verifique su conexión a internet.';
+          } else {
+            errorMsg = 'Error al cargar el perfil: ${e.toString()}';
+          }
+
+          _error = errorMsg;
           _isLoading = false;
+
+          // Si tenemos un usuario actual, usarlo como respaldo
+          if (_currentUser != null && _currentUser!.username != 'Usuario') {
+            _userData = {
+              'id': _currentUser!.id,
+              'username': _currentUser!.username,
+              'email': _currentUser!.email,
+              'points': _currentUser!.points,
+              'total_points': _currentUser!.points,
+              'races_played': 0,
+              'poles_guessed': 0,
+            };
+          }
         });
 
         // Mostrar un mensaje de error
@@ -157,121 +188,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final totalPoints = _userData?['total_points'] ?? 0;
     final racesPlayed = _userData?['races_played'] ?? 0;
     final polesGuessed = _userData?['poles_guessed'] ?? 0;
-    final userRank = _calculateRank(totalPoints);
 
-    // Calcular progreso hacia el siguiente rango
-    final (nextRank, pointsNeeded, progress) =
-        _calculateNextRankProgress(totalPoints);
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Avatar y nombre de usuario
+            const CircleAvatar(
+              radius: 50,
+              backgroundColor: Color.fromARGB(255, 255, 17, 0),
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              username,
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () => _navigateToEditProfile(),
+              icon: const Icon(Icons.edit),
+              label: const Text('Editar Perfil'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
 
-    print(
-        'ProfileScreen: Mostrando datos - Username: $username, Email: $email, Puntos: $totalPoints');
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Avatar y nombre de usuario
-          Center(
-            child: Column(
-              children: [
-                const CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Color.fromARGB(255, 255, 17, 0),
-                  child: Icon(
-                    Icons.person,
-                    size: 50,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  username,
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                Text(
-                  email,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    userRank,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                if (nextRank != null) ...[
-                  const SizedBox(height: 16),
-                  Text('Siguiente rango: $nextRank'),
-                  const SizedBox(height: 4),
-                  Text('Faltan $pointsNeeded puntos'),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 200,
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color.fromARGB(255, 255, 17, 0),
-                      ),
-                      minHeight: 10,
-                      borderRadius: BorderRadius.circular(5),
-                    ),
+            // Estadísticas
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF212121),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    spreadRadius: 1,
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _navigateToEditProfile(),
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Editar Perfil'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Estadísticas
-          Card(
-            elevation: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Estadísticas',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                  const Divider(),
-                  _buildStatRow('Puntos totales', totalPoints.toString()),
-                  _buildStatRow('Carreras jugadas', racesPlayed.toString()),
-                  _buildStatRow('Poles acertadas', polesGuessed.toString()),
+                  const Divider(
+                    thickness: 1.5,
+                    height: 30,
+                  ),
+                  _buildStatItem('#️⃣ Puntos totales', totalPoints.toString()),
+                  _buildStatItem('🏁 Carreras jugadas', racesPlayed.toString()),
+                  _buildStatItem('🏆 Poles acertadas', polesGuessed.toString()),
                 ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 40),
 
-          // Botón para cerrar sesión
-          Center(
-            child: ElevatedButton.icon(
+            // Botón para cerrar sesión
+            ElevatedButton.icon(
               onPressed: () async {
                 await _apiService.logout();
                 if (mounted) {
@@ -285,65 +284,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                minimumSize: const Size(200, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatRow(String label, String value) {
+  Widget _buildStatItem(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
             style: const TextStyle(
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
-          Text(value),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 255, 17, 0),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ],
       ),
     );
-  }
-
-  String _calculateRank(int points) {
-    if (points >= 500) return 'Campeón Mundial';
-    if (points >= 300) return 'Piloto Elite';
-    if (points >= 200) return 'Piloto Profesional';
-    if (points >= 100) return 'Piloto Amateur';
-    return 'Novato';
-  }
-
-  (String?, int, double) _calculateNextRankProgress(int points) {
-    if (points >= 500) {
-      // Ya es Campeón Mundial, no hay siguiente rango
-      return (null, 0, 1.0);
-    } else if (points >= 300) {
-      // Siguiente: Campeón Mundial (500 puntos)
-      final remaining = 500 - points;
-      final progress = (points - 300) / (500 - 300);
-      return ('Campeón Mundial', remaining, progress);
-    } else if (points >= 200) {
-      // Siguiente: Piloto Elite (300 puntos)
-      final remaining = 300 - points;
-      final progress = (points - 200) / (300 - 200);
-      return ('Piloto Elite', remaining, progress);
-    } else if (points >= 100) {
-      // Siguiente: Piloto Profesional (200 puntos)
-      final remaining = 200 - points;
-      final progress = (points - 100) / (200 - 100);
-      return ('Piloto Profesional', remaining, progress);
-    } else {
-      // Siguiente: Piloto Amateur (100 puntos)
-      final remaining = 100 - points;
-      final progress = points / 100;
-      return ('Piloto Amateur', remaining, progress);
-    }
   }
 
   Future<void> _navigateToEditProfile() async {
@@ -366,7 +349,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // Si se actualizó el perfil, recargar los datos
     if (result != null && result is Map<String, dynamic>) {
-      print('Perfil actualizado, recargando datos: $result');
       setState(() {
         _userData = result;
       });

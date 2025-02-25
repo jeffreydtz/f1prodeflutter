@@ -56,14 +56,14 @@ class ApiService {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/users/token/refresh/'),
-        body: jsonEncode({'refresh': _refreshToken}),
+        Uri.parse('$baseUrl/token/refresh/'),
         headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh': _refreshToken}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await _saveTokens(data['access'], _refreshToken!);
+        _accessToken = data['access'];
         return true;
       }
       return false;
@@ -75,48 +75,65 @@ class ApiService {
   // -------------------------------------------------
   // 1. REGISTER (CREACIÓN DE USUARIO)
   // -------------------------------------------------
-  /// Envía username, email, password a /users/register/
-  /// Retorna true si se creó el usuario (código 201), false si ocurrió error.
-  Future<bool> register(String username, String email, String password) async {
-    final url = Uri.parse('$baseUrl/users/register/');
-
+  Future<Map<String, dynamic>> register(
+      String username, String email, String password) async {
     try {
       final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$baseUrl/users/register/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'username': username,
           'email': email,
           'password': password,
+          'password_confirm': password,
         }),
       );
 
-      return response.statusCode == 201;
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 201) {
+        return {
+          'success': true,
+          'message': data['message'] ?? 'Usuario creado exitosamente',
+          'user': data['user'],
+        };
+      } else {
+        return {
+          'success': false,
+          'errors': data['errors'] ?? {'detail': 'Error en el registro'},
+        };
+      }
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'errors': {'detail': 'Error de conexión: $e'},
+      };
     }
   }
 
   // -------------------------------------------------
   // 2. LOGIN
   // -------------------------------------------------
-  /// Ejemplo de método que envía email y password a un endpoint de login
-  /// (POST /users/token/). Ajusta según tu lógica real en Django.
-  Future<bool> login(String username, String password) async {
-    final url = Uri.parse('$baseUrl/users/token/');
-
+  Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('$baseUrl/token/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'username': username,
           'password': password,
         }),
       );
 
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
         await _saveTokens(data['access'], data['refresh']);
 
         // Decodificar el token para obtener el user_id
@@ -127,11 +144,21 @@ class ApiService {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_id', userId);
 
-        return true;
+        return {
+          'success': true,
+          'message': 'Login exitoso',
+        };
+      } else {
+        return {
+          'success': false,
+          'error': data['detail'] ?? 'Credenciales inválidas',
+        };
       }
-      return false;
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'error': 'Error de conexión: $e',
+      };
     }
   }
 
@@ -382,36 +409,45 @@ class ApiService {
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $_accessToken',
+      'Accept': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers':
+          'Origin, Content-Type, Accept, Authorization, X-Request-With',
     };
 
     late http.Response response;
 
-    switch (method.toUpperCase()) {
-      case 'GET':
-        response = await http.get(
-          Uri.parse('$baseUrl$endpoint'),
-          headers: headers,
-        );
-        break;
-      case 'POST':
-        response = await http.post(
-          Uri.parse('$baseUrl$endpoint'),
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        break;
-      // Añade otros métodos según necesites
-    }
-
-    if (response.statusCode == 401) {
-      final refreshed = await _refreshAccessToken();
-      if (refreshed) {
-        // Retry the request with new token
-        return _authenticatedRequest(method, endpoint, body: body);
+    try {
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await http.get(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: headers,
+          );
+          break;
+        case 'POST':
+          response = await http.post(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: headers,
+            body: jsonEncode(body),
+          );
+          break;
+        // Añade otros métodos según necesites
       }
-    }
 
-    return response;
+      if (response.statusCode == 401) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          // Retry the request with new token
+          return _authenticatedRequest(method, endpoint, body: body);
+        }
+      }
+
+      return response;
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
   }
 
   Future<Map<String, dynamic>> getUserProfile() async {
@@ -422,12 +458,23 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        return {
+          'success': true,
+          'profile': data['profile'],
+        };
       } else {
-        throw Exception('Error al obtener perfil: ${response.statusCode}');
+        final error = jsonDecode(utf8.decode(response.bodyBytes));
+        return {
+          'success': false,
+          'error': error['detail'] ?? 'Error al obtener el perfil',
+        };
       }
     } catch (e) {
-      throw Exception('Error de conexión: $e');
+      return {
+        'success': false,
+        'error': 'Error de conexión: $e',
+      };
     }
   }
 

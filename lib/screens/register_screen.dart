@@ -96,25 +96,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     try {
-      final success = await _apiService.register(username, email, password);
+      final response = await _apiService.register(username, email, password);
       setState(() => _isLoading = false);
 
-      if (success) {
+      if (response['success']) {
         // Mostramos SnackBar de éxito
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Usuario registrado con éxito!')),
-        );
-        // Retornamos a la pantalla de Login
-        Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text(response['message'] ?? '¡Usuario registrado con éxito!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Retornamos a la pantalla de Login
+          Navigator.pop(context);
+        }
       } else {
+        final errors = response['errors'] as Map<String, dynamic>;
         setState(() {
-          _error = 'No se pudo registrar el usuario.';
+          if (errors.containsKey('username')) {
+            _error = errors['username'];
+          } else if (errors.containsKey('email')) {
+            _error = errors['email'];
+          } else if (errors.containsKey('password')) {
+            _error = errors['password'];
+          } else if (errors.containsKey('detail')) {
+            _error = errors['detail'];
+          } else {
+            _error = 'Error en el registro. Por favor, intente nuevamente.';
+          }
         });
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = 'Error: $e';
+        _error = 'Error de conexión. Por favor, intente nuevamente.';
       });
     }
   }

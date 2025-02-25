@@ -87,9 +87,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
+    // Validaciones básicas
     if (username.isEmpty || email.isEmpty || password.isEmpty) {
       setState(() {
-        _error = 'Completa todos los campos';
+        _error = 'Todos los campos son obligatorios';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Validación de email
+    if (!email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _error = 'Por favor ingresa un email válido';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    // Validación de contraseña
+    if (password.length < 8) {
+      setState(() {
+        _error = 'La contraseña debe tener al menos 8 caracteres';
         _isLoading = false;
       });
       return;
@@ -100,38 +119,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _isLoading = false);
 
       if (response['success']) {
-        // Mostramos SnackBar de éxito
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text(response['message'] ?? '¡Usuario registrado con éxito!'),
+            const SnackBar(
+              content: Text('¡Usuario registrado con éxito!'),
               backgroundColor: Colors.green,
             ),
           );
-          // Retornamos a la pantalla de Login
           Navigator.pop(context);
         }
       } else {
-        final errors = response['errors'] as Map<String, dynamic>;
-        setState(() {
+        String errorMessage = '';
+
+        if (response['errors'] is Map<String, dynamic>) {
+          final errors = response['errors'] as Map<String, dynamic>;
           if (errors.containsKey('username')) {
-            _error = errors['username'];
+            errorMessage = errors['username'].toString();
           } else if (errors.containsKey('email')) {
-            _error = errors['email'];
+            errorMessage = errors['email'].toString();
           } else if (errors.containsKey('password')) {
-            _error = errors['password'];
+            errorMessage = errors['password'].toString();
           } else if (errors.containsKey('detail')) {
-            _error = errors['detail'];
-          } else {
-            _error = 'Error en el registro. Por favor, intente nuevamente.';
+            errorMessage = errors['detail'].toString();
           }
+        } else if (response['error'] != null) {
+          errorMessage = response['error'].toString();
+        }
+
+        setState(() {
+          _error = errorMessage.isNotEmpty
+              ? errorMessage
+              : 'Error en el registro. Por favor, intente nuevamente.';
         });
       }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = 'Error de conexión. Por favor, intente nuevamente.';
+        if (e.toString().contains('500')) {
+          _error = 'Error en el servidor. Por favor, intente más tarde.';
+        } else if (e.toString().contains('timeout')) {
+          _error = 'Tiempo de espera agotado. Verifica tu conexión.';
+        } else {
+          _error = 'Error de conexión. Por favor, intente nuevamente.';
+        }
       });
     }
   }

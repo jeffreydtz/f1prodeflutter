@@ -100,24 +100,30 @@ class ApiService {
   // -------------------------------------------------
   // 3. REFRESH TOKEN
   // -------------------------------------------------
-  Future<bool> _refreshToken() async {
+  Future<bool> _refreshAccessTokenFromServer() async {
     try {
       final prefs = await _storage;
       final refreshToken = prefs.getString('refresh_token');
 
-      if (refreshToken == null) return false;
+      if (refreshToken == null) {
+        return false;
+      }
 
       final response = await http.post(
         Uri.parse('$baseUrl$refreshEndpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({'refresh': refreshToken}),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        await prefs.setString('access_token', data['access']);
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        await _saveTokens(data['access'], refreshToken);
         return true;
       }
+
       return false;
     } catch (e) {
       return false;
@@ -152,7 +158,7 @@ class ApiService {
 
       if (response.statusCode == 401) {
         // Token expirado, intentar refrescar
-        final refreshed = await _refreshToken();
+        final refreshed = await _refreshAccessTokenFromServer();
         if (refreshed) {
           // Reintentar con el nuevo token
           return _authenticatedRequest(endpoint, method, body: body);
@@ -204,12 +210,16 @@ class ApiService {
     }
   }
 
-  Future<void> _saveTokens(String accessToken, String refreshToken) async {
+  Future<void> _saveTokens(String? accessToken, String? refreshToken) async {
     final prefs = await _storage;
-    await prefs.setString('access_token', accessToken);
-    await prefs.setString('refresh_token', refreshToken);
-    _accessToken = accessToken;
-    _refreshToken = refreshToken;
+    if (accessToken != null) {
+      await prefs.setString('access_token', accessToken);
+      _accessToken = accessToken;
+    }
+    if (refreshToken != null) {
+      await prefs.setString('refresh_token', refreshToken);
+      _refreshToken = refreshToken;
+    }
   }
 
   Future<void> _loadTokens() async {

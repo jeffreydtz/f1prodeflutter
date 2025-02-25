@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
@@ -43,8 +44,12 @@ class ApiService {
   Future<Map<String, dynamic>> register(
       String username, String email, String password) async {
     try {
+      // Imprimir la URL para depuración
+      final registerUrl = '$baseUrl$registerEndpoint';
+      print('Intentando registro con URL: $registerUrl');
+
       final response = await http.post(
-        Uri.parse('$baseUrl$registerEndpoint'),
+        Uri.parse(registerUrl),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -56,21 +61,29 @@ class ApiService {
         }),
       );
 
+      // Imprimir el código de estado para depuración
+      print('Código de estado de respuesta registro: ${response.statusCode}');
+
       final data = jsonDecode(utf8.decode(response.bodyBytes));
 
       if (response.statusCode == 201) {
+        print('Registro exitoso: ${data['user']}');
         return {'success': true, 'user': data['user']};
       } else {
+        print('Error en registro: $data');
         return {'success': false, 'errors': data};
       }
     } on http.ClientException catch (e) {
+      print('Error de conexión en registro: ${e.message}');
       return {'success': false, 'error': 'Error de conexión: ${e.message}'};
     } on FormatException catch (e) {
+      print('Error en formato de respuesta registro: ${e.message}');
       return {
         'success': false,
         'error': 'Error en formato de respuesta: ${e.message}'
       };
     } catch (e) {
+      print('Error inesperado en registro: ${e.toString()}');
       return {'success': false, 'error': 'Error inesperado: ${e.toString()}'};
     }
   }
@@ -80,8 +93,11 @@ class ApiService {
   // -------------------------------------------------
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
+      final loginUrl = '$baseUrl$loginEndpoint';
+      print('Intentando login con URL: $loginUrl');
+
       final response = await http.post(
-        Uri.parse('$baseUrl$loginEndpoint'),
+        Uri.parse(loginUrl),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -92,58 +108,48 @@ class ApiService {
         }),
       );
 
+      print('Código de estado de respuesta login: ${response.statusCode}');
+      print('Respuesta completa: ${response.body}');
+
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-
-        if (data['access'] != null && data['refresh'] != null) {
-          await _saveTokens(data['access'], data['refresh']);
-
-          // Obtener información del usuario después de iniciar sesión
-          try {
-            await _loadUserProfile();
-            return {'success': true};
-          } catch (e) {
-            // Si falla la carga del perfil, aún así consideramos el login exitoso
-            return {
-              'success': true,
-              'warning': 'Login exitoso pero no se pudo cargar el perfil'
-            };
-          }
+        print('Login exitoso, guardando tokens');
+        await _saveTokens(
+          accessToken: data['access'],
+          refreshToken: data['refresh'],
+        );
+        print('Login completado para usuario: $username');
+        return {'success': true};
+      } else {
+        print('Error en login: $data');
+        if (data.containsKey('detail')) {
+          return {'success': false, 'message': data['detail']};
+        } else if (data.containsKey('non_field_errors')) {
+          return {'success': false, 'message': data['non_field_errors'][0]};
         } else {
           return {
             'success': false,
-            'error': 'Respuesta incompleta del servidor'
-          };
-        }
-      } else if (response.statusCode == 401) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        return {
-          'success': false,
-          'error': data['detail'] ?? 'Credenciales inválidas'
-        };
-      } else {
-        try {
-          final data = jsonDecode(utf8.decode(response.bodyBytes));
-          return {
-            'success': false,
-            'error': data['detail'] ?? 'Error al iniciar sesión'
-          };
-        } catch (e) {
-          return {
-            'success': false,
-            'error': 'Error del servidor (${response.statusCode})'
+            'message': 'Error de autenticación: ${response.statusCode}'
           };
         }
       }
-    } on http.ClientException catch (e) {
-      return {'success': false, 'error': 'Error de conexión: ${e.message}'};
-    } on FormatException catch (e) {
+    } on SocketException catch (e) {
+      print('Error de conexión en login: ${e.toString()}');
       return {
         'success': false,
-        'error': 'Error en formato de respuesta: ${e.message}'
+        'message':
+            'No se pudo conectar al servidor. Verifica tu conexión a internet.'
+      };
+    } on FormatException catch (e) {
+      print('Error de formato en login: ${e.toString()}');
+      return {
+        'success': false,
+        'message': 'Error en el formato de la respuesta del servidor.'
       };
     } catch (e) {
-      return {'success': false, 'error': 'Error inesperado: ${e.toString()}'};
+      print('Error general en login: ${e.toString()}');
+      return {'success': false, 'message': 'Error: ${e.toString()}'};
     }
   }
 
@@ -168,11 +174,15 @@ class ApiService {
 
   Future<bool> _refreshAccessTokenFromServer() async {
     try {
+      print('Iniciando proceso de renovación de token');
       final refreshToken = await _getRefreshToken();
-
       if (refreshToken == null) {
+        print('No hay refresh token disponible');
         return false;
       }
+
+      print('Intentando refrescar token con URL: $baseUrl$refreshEndpoint');
+      print('Refresh token: ${refreshToken.substring(0, 10)}...');
 
       final response = await http.post(
         Uri.parse('$baseUrl$refreshEndpoint'),
@@ -183,25 +193,37 @@ class ApiService {
         body: jsonEncode({'refresh': refreshToken}),
       );
 
+      print('Código de estado de respuesta refresh: ${response.statusCode}');
+      print('Respuesta completa: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-        if (data['access'] != null) {
-          await _saveTokens(data['access'], null);
-          return true;
-        }
-      }
+        print('Token recibido: ${data['access'].substring(0, 10)}...');
 
-      // Si llegamos aquí, el refresh token no es válido
-      await _clearTokens();
-      return false;
+        await _saveTokens(
+          accessToken: data['access'],
+          refreshToken: refreshToken, // Mantener el mismo refresh token
+        );
+        print('Token refrescado exitosamente');
+        return true;
+      } else {
+        print('Error al refrescar token: ${response.body}');
+        print('Limpiando tokens debido a error de refresh');
+        await _clearTokens();
+        return false;
+      }
     } catch (e) {
-      // En caso de error, limpiamos los tokens para forzar un nuevo login
+      print('Error en refresh token: ${e.toString()}');
+      print('Limpiando tokens debido a excepción');
       await _clearTokens();
       return false;
     }
   }
 
-  Future<void> _saveTokens(String? accessToken, String? refreshToken) async {
+  Future<void> _saveTokens({String? accessToken, String? refreshToken}) async {
+    print(
+        'Guardando tokens - Access: ${accessToken != null ? 'presente' : 'null'}, Refresh: ${refreshToken != null ? 'presente' : 'null'}');
+
     final prefs = await _storage;
     if (accessToken != null) {
       await prefs.setString('access_token', accessToken);
@@ -210,16 +232,24 @@ class ApiService {
       // Extraer y guardar el ID del usuario del token JWT
       try {
         final decodedToken = JwtDecoder.decode(accessToken);
+        print('Token decodificado: $decodedToken');
+
         if (decodedToken.containsKey('user_id')) {
-          await prefs.setString('user_id', decodedToken['user_id'].toString());
+          final userId = decodedToken['user_id'].toString();
+          await prefs.setString('user_id', userId);
+          print('ID de usuario guardado: $userId');
+        } else {
+          print('El token no contiene user_id');
         }
       } catch (e) {
         // Ignorar errores al decodificar el token
+        print('Error al decodificar token: ${e.toString()}');
       }
     }
     if (refreshToken != null) {
       await prefs.setString('refresh_token', refreshToken);
       _refreshToken = refreshToken;
+      print('Refresh token guardado');
     }
   }
 
@@ -230,6 +260,8 @@ class ApiService {
   }
 
   Future<void> _clearTokens() async {
+    print('Limpiando tokens de sesión');
+
     final prefs = await _storage;
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
@@ -237,141 +269,213 @@ class ApiService {
     _accessToken = null;
     _refreshToken = null;
     currentUser = null;
+
+    print('Tokens limpiados correctamente');
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {
     final token = await _getAccessToken();
-    return {
+    final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
+    print('Headers de autenticación: $headers');
+    return headers;
   }
 
   // -------------------------------------------------
   // 4. AUTHENTICATED REQUEST HELPER
   // -------------------------------------------------
   Future<dynamic> _authenticatedRequest(
-    String endpoint,
-    String method, {
-    dynamic body,
-    bool requiresAuth = true,
-    int retryCount = 0,
+    String method,
+    String endpoint, {
+    Map<String, dynamic>? body,
+    Map<String, String>? queryParams,
   }) async {
+    print('Iniciando solicitud autenticada: $method $endpoint');
+
+    final url = Uri.parse('$baseUrl$endpoint').replace(
+      queryParameters: queryParams,
+    );
+    print('URL completa: $url');
+
+    // Verificar si hay token de acceso
+    final accessToken = await _getAccessToken();
+    if (accessToken == null) {
+      print('No hay token de acceso disponible para la solicitud');
+      throw Exception('No hay token de acceso disponible');
+    }
+
+    // Obtener headers con token
+    final headers = await _getAuthHeaders();
+    print('Headers para solicitud: $headers');
+
+    http.Response response;
     try {
-      if (requiresAuth) {
-        final token = await _getAccessToken();
-        if (token == null) {
-          throw Exception('No hay sesión activa');
-        }
-      }
-
-      final headers = await _getAuthHeaders();
-      http.Response response;
-
-      final uri = Uri.parse('$baseUrl$endpoint');
-
-      switch (method) {
+      // Realizar la solicitud según el método
+      switch (method.toUpperCase()) {
         case 'GET':
-          response = await http.get(uri, headers: headers);
+          print('Ejecutando solicitud GET');
+          response = await http.get(url, headers: headers);
           break;
         case 'POST':
+          print('Ejecutando solicitud POST con body: $body');
           response = await http.post(
-            uri,
+            url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
           );
           break;
         case 'PUT':
+          print('Ejecutando solicitud PUT con body: $body');
           response = await http.put(
-            uri,
+            url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
           );
           break;
         case 'PATCH':
+          print('Ejecutando solicitud PATCH con body: $body');
           response = await http.patch(
-            uri,
+            url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
           );
           break;
         case 'DELETE':
-          response = await http.delete(uri, headers: headers);
+          print('Ejecutando solicitud DELETE');
+          response = await http.delete(url, headers: headers);
           break;
         default:
           throw Exception('Método HTTP no soportado: $method');
       }
 
-      // Manejar respuesta según el código de estado
+      print('Respuesta recibida: ${response.statusCode}');
+
+      // Si el token expiró (401), intentar refrescarlo y reintentar
+      if (response.statusCode == 401) {
+        print('Token expirado (401), intentando refrescar');
+        final refreshed = await _refreshAccessTokenFromServer();
+
+        if (refreshed) {
+          print('Token refrescado exitosamente, reintentando solicitud');
+          // Obtener nuevos headers con el token refrescado
+          final newHeaders = await _getAuthHeaders();
+          print('Nuevos headers para reintento: $newHeaders');
+
+          // Reintentar la solicitud con el nuevo token
+          switch (method.toUpperCase()) {
+            case 'GET':
+              print('Reintentando solicitud GET');
+              response = await http.get(url, headers: newHeaders);
+              break;
+            case 'POST':
+              print('Reintentando solicitud POST');
+              response = await http.post(
+                url,
+                headers: newHeaders,
+                body: body != null ? jsonEncode(body) : null,
+              );
+              break;
+            case 'PUT':
+              print('Reintentando solicitud PUT');
+              response = await http.put(
+                url,
+                headers: newHeaders,
+                body: body != null ? jsonEncode(body) : null,
+              );
+              break;
+            case 'PATCH':
+              print('Reintentando solicitud PATCH');
+              response = await http.patch(
+                url,
+                headers: newHeaders,
+                body: body != null ? jsonEncode(body) : null,
+              );
+              break;
+            case 'DELETE':
+              print('Reintentando solicitud DELETE');
+              response = await http.delete(url, headers: newHeaders);
+              break;
+            default:
+              throw Exception('Método HTTP no soportado: $method');
+          }
+          print('Respuesta del reintento: ${response.statusCode}');
+        } else {
+          print(
+              'No se pudo refrescar el token, la solicitud falló definitivamente');
+        }
+      }
+
+      // Procesar la respuesta
+      print('Procesando respuesta HTTP: ${response.statusCode}');
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // Respuesta exitosa
-        return jsonDecode(utf8.decode(response.bodyBytes));
-      } else if (response.statusCode == 401 && requiresAuth && retryCount < 1) {
-        // Token expirado, intentar refrescar
-        final refreshed = await _refreshAccessTokenFromServer();
-        if (refreshed) {
-          // Reintentar con el nuevo token
-          return _authenticatedRequest(
-            endpoint,
-            method,
-            body: body,
-            requiresAuth: requiresAuth,
-            retryCount: retryCount + 1,
-          );
-        } else {
-          throw Exception('Sesión expirada');
+        if (response.body.isEmpty) {
+          print('Respuesta vacía pero exitosa');
+          return {'success': true};
+        }
+
+        try {
+          final data = jsonDecode(utf8.decode(response.bodyBytes));
+          print('Respuesta decodificada exitosamente');
+          return data;
+        } catch (e) {
+          print('Error al decodificar respuesta: ${e.toString()}');
+          throw Exception('Error al procesar la respuesta del servidor');
         }
       } else {
-        // Otros errores
+        // Error en la respuesta
+        print('Error en respuesta HTTP: ${response.statusCode}');
         try {
           final errorData = jsonDecode(utf8.decode(response.bodyBytes));
+          print('Datos de error: $errorData');
+
           if (errorData is Map) {
             final errorMessage = errorData['detail'] ??
                 errorData['error'] ??
                 'Error del servidor (${response.statusCode})';
             throw Exception(errorMessage);
           }
+          throw Exception('Error del servidor (${response.statusCode})');
         } catch (e) {
-          // Si no podemos decodificar la respuesta, usamos el código de estado
+          if (e is Exception) {
+            rethrow;
+          }
           throw Exception('Error del servidor (${response.statusCode})');
         }
-        throw Exception('Error del servidor (${response.statusCode})');
       }
-    } on http.ClientException catch (e) {
-      throw Exception('Error de conexión: ${e.message}');
-    } on FormatException catch (e) {
-      throw Exception('Error en formato de respuesta: ${e.message}');
+    } on SocketException catch (e) {
+      print('Error de conexión en solicitud autenticada: ${e.toString()}');
+      throw Exception('Error de conexión: ${e.toString()}');
     } catch (e) {
-      if (e is Exception) {
-        rethrow;
-      }
-      throw Exception('Error inesperado: ${e.toString()}');
+      print('Error general en solicitud autenticada: ${e.toString()}');
+      throw Exception('Error en solicitud: ${e.toString()}');
     }
   }
 
   // -------------------------------------------------
   // 5. USER PROFILE
   // -------------------------------------------------
-  Future<void> _loadUserProfile() async {
+  Future<Map<String, dynamic>> _loadUserProfile() async {
+    print('Cargando perfil de usuario desde: $baseUrl$profileEndpoint');
     try {
       final response = await _authenticatedRequest(
-        profileEndpoint,
         'GET',
+        profileEndpoint,
       );
 
-      if (response['success'] && response['profile'] != null) {
-        final profileData = response['profile'];
-        currentUser = UserModel(
-          id: profileData['id'].toString(),
-          username: profileData['username'] ?? '',
-          email: profileData['email'] ?? '',
-          password: '',
-          points: profileData['points'] ?? 0,
-        );
+      final profileData = response;
+      if (profileData != null && profileData is Map<String, dynamic>) {
+        print('Perfil cargado exitosamente: ${profileData['username']}');
+        return profileData;
+      } else {
+        print('Respuesta de perfil no contiene datos: $profileData');
+        throw Exception('No se pudo cargar el perfil');
       }
     } catch (e) {
-      // Si falla, no establecemos el currentUser
+      print('Error al cargar perfil: ${e.toString()}');
       rethrow;
     }
   }
@@ -379,59 +483,38 @@ class ApiService {
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
       final response = await _authenticatedRequest(
-        profileEndpoint,
         'GET',
+        profileEndpoint,
       );
 
-      if (response['success']) {
+      if (response is Map<String, dynamic>) {
         return response;
       } else {
-        final error = response['error'] ?? 'Error al obtener el perfil';
-        return {
-          'success': false,
-          'error': error,
-        };
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      print('Error al obtener perfil: ${e.toString()}');
+      rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> updateUserProfile({
-    String? username,
-    String? email,
-  }) async {
+  Future<Map<String, dynamic>> updateUserProfile(
+      Map<String, dynamic> body) async {
     try {
-      final body = {
-        if (username != null) 'username': username,
-        if (email != null) 'email': email,
-      };
-
       final response = await _authenticatedRequest(
-        profileEndpoint,
         'PATCH',
+        profileEndpoint,
         body: body,
       );
 
-      if (response['success']) {
-        // Actualizar el usuario actual si la respuesta es exitosa
-        await _loadUserProfile();
+      if (response is Map<String, dynamic>) {
         return response;
       } else {
-        final error = response['error'] ?? 'Error al actualizar el perfil';
-        return {
-          'success': false,
-          'error': error,
-        };
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
-      };
+      print('Error al actualizar perfil: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -441,44 +524,40 @@ class ApiService {
   Future<List<Race>> getRaces() async {
     try {
       final response = await _authenticatedRequest(
-        racesEndpoint,
         'GET',
+        racesEndpoint,
       );
 
-      if (response['success']) {
-        final List<dynamic> jsonList = response['races'];
-        return jsonList.map((raceJson) => Race.fromJson(raceJson)).toList();
+      if (response is List) {
+        return response.map((raceData) => Race.fromJson(raceData)).toList();
       } else {
-        throw Exception('Error al obtener carreras: ${response['error']}');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al obtener carreras: ${e.toString()}');
+      rethrow;
     }
   }
 
   // -------------------------------------------------
   // 7. DRIVERS
   // -------------------------------------------------
-  Future<List<String>> getDrivers({String? season}) async {
+  Future<List<String>> getDrivers() async {
+    final endpoint = driversEndpoint;
     try {
-      final endpoint =
-          season != null ? '$driversEndpoint?season=$season' : driversEndpoint;
-
       final response = await _authenticatedRequest(
-        endpoint,
         'GET',
+        endpoint,
       );
 
-      if (response['success']) {
-        final List<dynamic> driversList = response['drivers'];
-        final List<String> pilotNames =
-            driversList.map((driver) => driver.toString()).toList();
-        return pilotNames;
+      if (response is List) {
+        return response.map((driver) => driver.toString()).toList();
       } else {
-        throw Exception('Error al obtener drivers: ${response['error']}');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al obtener pilotos: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -488,18 +567,18 @@ class ApiService {
   Future<List<BetResult>> getUserBetResults() async {
     try {
       final response = await _authenticatedRequest(
-        betsEndpoint,
         'GET',
+        betsEndpoint,
       );
 
-      if (response['success']) {
-        final List<dynamic> bets = response['bets'] ?? [];
-        return bets.map((betData) => BetResult.fromJson(betData)).toList();
+      if (response is List) {
+        return response.map((betData) => BetResult.fromJson(betData)).toList();
       } else {
-        throw Exception('Error al obtener apuestas: ${response['error']}');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al obtener resultados de apuestas: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -517,11 +596,7 @@ class ApiService {
     List<String>? sprintTop10,
   }) async {
     try {
-      final userId = await getCurrentUserId();
-      if (userId == null) throw Exception('Usuario no autenticado');
-
       final requestBody = {
-        'user': userId,
         'season': season,
         'round': round,
         'race_name': raceName,
@@ -532,23 +607,22 @@ class ApiService {
         'top10': top10,
         'dnf': dnf,
         'fastest_lap': fastestLap,
-        if (hasSprint && sprintTop10 != null) 'sprint_top10': sprintTop10,
       };
 
+      if (hasSprint && sprintTop10 != null) {
+        requestBody['sprint_top10'] = sprintTop10;
+      }
+
       final response = await _authenticatedRequest(
-        betsEndpoint,
         'POST',
+        betsEndpoint,
         body: requestBody,
       );
 
-      if (response['success']) {
-        return true;
-      } else {
-        final error = response['error'] ?? 'Error desconocido';
-        throw Exception('Error al crear apuesta: $error');
-      }
+      return response != null;
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al crear apuesta: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -558,76 +632,72 @@ class ApiService {
   Future<List<Tournament>> getTournaments() async {
     try {
       final response = await _authenticatedRequest(
-        tournamentsEndpoint,
         'GET',
+        tournamentsEndpoint,
       );
 
-      if (response['success']) {
-        final List<dynamic> jsonList = response['tournaments'];
-        final tournaments =
-            jsonList.map((json) => Tournament.fromJson(json)).toList();
-        return tournaments;
+      if (response is List) {
+        return response
+            .map((tournamentData) => Tournament.fromJson(tournamentData))
+            .toList();
       } else {
-        throw Exception('Error al obtener torneos: ${response['error']}');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al obtener torneos: ${e.toString()}');
+      rethrow;
     }
   }
 
   Future<Tournament> createTournament(String name) async {
     try {
       final response = await _authenticatedRequest(
-        tournamentsEndpoint,
         'POST',
+        tournamentsEndpoint,
         body: {'name': name},
       );
 
-      if (response['success']) {
-        return Tournament.fromJson(response['tournament']);
+      if (response is Map<String, dynamic>) {
+        return Tournament.fromJson(response);
       } else {
-        final error = response['error'] ?? 'Error desconocido';
-        throw Exception('Error al crear torneo: $error');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al crear torneo: ${e.toString()}');
+      rethrow;
     }
   }
 
   Future<bool> joinTournament(String inviteCode) async {
     try {
       final response = await _authenticatedRequest(
-        '$tournamentsEndpoint/join/',
         'POST',
+        '$tournamentsEndpoint/join/',
         body: {'inviteCode': inviteCode},
       );
 
-      if (response['success']) {
-        return true;
-      } else {
-        throw Exception(response['error'] ?? 'Error al unirse al torneo');
-      }
+      return response != null;
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al unirse al torneo: ${e.toString()}');
+      rethrow;
     }
   }
 
-  Future<Map<String, dynamic>> getTournamentLeaderboard(
-      int tournamentId) async {
+  Future<Tournament> getTournamentLeaderboard(int tournamentId) async {
     try {
       final response = await _authenticatedRequest(
-        '$tournamentsEndpoint/$tournamentId/leaderboard/',
         'GET',
+        '$tournamentsEndpoint/$tournamentId/leaderboard/',
       );
 
-      if (response['success']) {
-        return response;
+      if (response is Map<String, dynamic>) {
+        return Tournament.fromJson(response);
       } else {
-        throw Exception(
-            response['error'] ?? 'Error al obtener la clasificación');
+        throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
-      throw Exception('Error: ${e.toString()}');
+      print('Error al obtener tabla de posiciones: ${e.toString()}');
+      rethrow;
     }
   }
 
@@ -635,23 +705,33 @@ class ApiService {
   // 10. SESSION MANAGEMENT
   // -------------------------------------------------
   Future<void> logout() async {
+    print('Iniciando proceso de logout');
     await _clearTokens();
+    print('Logout completado');
   }
 
   Future<bool> isLoggedIn() async {
     final token = await _getAccessToken();
-    if (token == null) return false;
+    if (token == null) {
+      print('No hay token de acceso disponible');
+      return false;
+    }
 
     try {
       // Verificar si el token está expirado
       final isExpired = JwtDecoder.isExpired(token);
+      print('Token de acceso expirado: $isExpired');
+
       if (isExpired) {
         // Intentar refrescar el token
+        print('Intentando refrescar token expirado');
         return await _refreshAccessTokenFromServer();
       }
+      print('Token de acceso válido');
       return true;
     } catch (e) {
       // Si hay error al decodificar, consideramos que no hay sesión válida
+      print('Error al verificar token: ${e.toString()}');
       return false;
     }
   }
@@ -662,24 +742,37 @@ class ApiService {
       final userId = prefs.getString('user_id');
 
       if (userId == null) {
+        print('No hay ID de usuario almacenado, intentando extraer del token');
         // Intentar extraer del token
         final token = await _getAccessToken();
         if (token != null) {
           try {
             final decodedToken = JwtDecoder.decode(token);
+            print('Token decodificado: $decodedToken');
+
             if (decodedToken.containsKey('user_id')) {
               final id = decodedToken['user_id'].toString();
               await prefs.setString('user_id', id);
+              print('ID de usuario extraído del token: $id');
               return id;
+            } else {
+              print('El token no contiene user_id');
             }
           } catch (e) {
             // Ignorar errores al decodificar
+            print(
+                'Error al decodificar token para obtener user_id: ${e.toString()}');
           }
+        } else {
+          print('No hay token de acceso disponible');
         }
+      } else {
+        print('ID de usuario encontrado en almacenamiento: $userId');
       }
 
       return userId;
     } catch (e) {
+      print('Error al obtener ID de usuario: ${e.toString()}');
       return null;
     }
   }

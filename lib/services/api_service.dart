@@ -15,8 +15,7 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  /// Ajusta la URL base de tu backend Django.
-  /// Usa "10.0.2.2" si corres la app en un emulador Android local.
+  /// URL base del backend Django
   static const String baseUrl =
       'https://f1prodedjango-production.up.railway.app/api';
 
@@ -25,52 +24,6 @@ class ApiService {
 
   String? _accessToken;
   String? _refreshToken;
-
-  // Token Storage Methods
-  Future<void> _saveTokens(String accessToken, String refreshToken) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', accessToken);
-    await prefs.setString('refresh_token', refreshToken);
-    _accessToken = accessToken;
-    _refreshToken = refreshToken;
-  }
-
-  Future<bool> _loadTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('access_token');
-    _refreshToken = prefs.getString('refresh_token');
-    return _accessToken != null;
-  }
-
-  Future<void> _clearTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
-    _accessToken = null;
-    _refreshToken = null;
-  }
-
-  // Token Refresh
-  Future<bool> _refreshAccessToken() async {
-    if (_refreshToken == null) return false;
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/token/refresh/'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh': _refreshToken}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _accessToken = data['access'];
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
 
   // -------------------------------------------------
   // 1. REGISTER (CREACIÓN DE USUARIO)
@@ -133,7 +86,7 @@ class ApiService {
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && data['access'] != null) {
         await _saveTokens(data['access'], data['refresh']);
 
         // Decodificar el token para obtener el user_id
@@ -160,6 +113,122 @@ class ApiService {
         'error': 'Error de conexión: $e',
       };
     }
+  }
+
+  // -------------------------------------------------
+  // 3. REFRESH TOKEN
+  // -------------------------------------------------
+  Future<bool> _refreshAccessToken() async {
+    if (_refreshToken == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/token/refresh/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'refresh': _refreshToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data['access'] != null) {
+          _accessToken = data['access'];
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // -------------------------------------------------
+  // 4. AUTHENTICATED REQUEST HELPER
+  // -------------------------------------------------
+  Future<http.Response> _authenticatedRequest(
+    String method,
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    if (_accessToken == null) {
+      await _loadTokens();
+    }
+
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+    };
+
+    late http.Response response;
+
+    try {
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await http.get(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: headers,
+          );
+          break;
+        case 'POST':
+          response = await http.post(
+            Uri.parse('$baseUrl$endpoint'),
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+          break;
+        default:
+          throw Exception('Método HTTP no soportado');
+      }
+
+      if (response.statusCode == 401) {
+        // Token expirado, intentar refrescar
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          // Reintentar la petición con el nuevo token
+          return _authenticatedRequest(method, endpoint, body: body);
+        } else {
+          // Si no se pudo refrescar, limpiar tokens y retornar error
+          await _clearTokens();
+          throw Exception('Sesión expirada');
+        }
+      }
+
+      return response;
+    } catch (e) {
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // -------------------------------------------------
+  // 5. TOKEN MANAGEMENT
+  // -------------------------------------------------
+  Future<void> _saveTokens(String accessToken, String refreshToken) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('access_token', accessToken);
+    await prefs.setString('refresh_token', refreshToken);
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
+  }
+
+  Future<void> _loadTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
+  }
+
+  Future<void> _clearTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('user_id');
+    _accessToken = null;
+    _refreshToken = null;
+    currentUser = null;
   }
 
   // -------------------------------------------------
@@ -394,60 +463,6 @@ class ApiService {
     _accessToken = null;
     _refreshToken = null;
     currentUser = null;
-  }
-
-  // Authenticated Request Helper
-  Future<http.Response> _authenticatedRequest(
-    String method,
-    String endpoint, {
-    Map<String, dynamic>? body,
-  }) async {
-    if (_accessToken == null) {
-      await _loadTokens();
-    }
-
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $_accessToken',
-      'Accept': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers':
-          'Origin, Content-Type, Accept, Authorization, X-Request-With',
-    };
-
-    late http.Response response;
-
-    try {
-      switch (method.toUpperCase()) {
-        case 'GET':
-          response = await http.get(
-            Uri.parse('$baseUrl$endpoint'),
-            headers: headers,
-          );
-          break;
-        case 'POST':
-          response = await http.post(
-            Uri.parse('$baseUrl$endpoint'),
-            headers: headers,
-            body: jsonEncode(body),
-          );
-          break;
-        // Añade otros métodos según necesites
-      }
-
-      if (response.statusCode == 401) {
-        final refreshed = await _refreshAccessToken();
-        if (refreshed) {
-          // Retry the request with new token
-          return _authenticatedRequest(method, endpoint, body: body);
-        }
-      }
-
-      return response;
-    } catch (e) {
-      throw Exception('Error de conexión: $e');
-    }
   }
 
   Future<Map<String, dynamic>> getUserProfile() async {

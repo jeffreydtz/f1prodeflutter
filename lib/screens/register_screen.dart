@@ -12,6 +12,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _passwordConfirmController =
+      TextEditingController();
 
   bool _isLoading = false;
   String? _error;
@@ -46,6 +48,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               style: const TextStyle(color: Colors.white),
               obscureText: true,
               decoration: _buildTextFieldDecoration('Password'),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordConfirmController,
+              style: const TextStyle(color: Colors.white),
+              obscureText: true,
+              decoration: _buildTextFieldDecoration('Confirmar Password'),
             ),
             const SizedBox(height: 24),
             _isLoading
@@ -86,9 +95,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final username = _usernameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final passwordConfirm = _passwordConfirmController.text.trim();
 
     // Validaciones básicas
-    if (username.isEmpty || email.isEmpty || password.isEmpty) {
+    if (username.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        passwordConfirm.isEmpty) {
       setState(() {
         _error = 'Todos los campos son obligatorios';
         _isLoading = false;
@@ -114,8 +127,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // Validación de coincidencia de contraseñas
+    if (password != passwordConfirm) {
+      setState(() {
+        _error = 'Las contraseñas no coinciden';
+        _isLoading = false;
+      });
+      return;
+    }
+
     try {
-      final response = await _apiService.register(username, email, password);
+      final response = await _apiService.register(
+          username, email, password, passwordConfirm);
       setState(() => _isLoading = false);
 
       if (response['success']) {
@@ -139,6 +162,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             errorMessage = errors['email'].toString();
           } else if (errors.containsKey('password')) {
             errorMessage = errors['password'].toString();
+          } else if (errors.containsKey('password_confirm')) {
+            errorMessage = errors['password_confirm'].toString();
           } else if (errors.containsKey('detail')) {
             errorMessage = errors['detail'].toString();
           }

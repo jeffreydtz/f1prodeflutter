@@ -49,8 +49,8 @@ class ApiService {
   // -------------------------------------------------
   // 1. REGISTER (CREACIÓN DE USUARIO)
   // -------------------------------------------------
-  Future<Map<String, dynamic>> register(
-      String username, String email, String password) async {
+  Future<Map<String, dynamic>> register(String username, String email,
+      String password, String passwordConfirm) async {
     try {
       // Imprimir la URL para depuración
       final registerUrl = '$baseUrl$registerEndpoint';
@@ -66,6 +66,7 @@ class ApiService {
           'username': username,
           'email': email,
           'password': password,
+          'password_confirm': passwordConfirm,
         }),
       );
 

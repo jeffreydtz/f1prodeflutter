@@ -1,6 +1,7 @@
 import 'package:f1prodeflutter/services/api_service.dart';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
+import '../screens/edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -227,6 +228,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => _navigateToEditProfile(),
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Editar Perfil'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                ),
               ],
             ),
           ),
@@ -330,6 +343,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final remaining = 100 - points;
       final progress = points / 100;
       return ('Piloto Amateur', remaining, progress);
+    }
+  }
+
+  Future<void> _navigateToEditProfile() async {
+    if (_userData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo cargar la información del perfil'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(userData: _userData!),
+      ),
+    );
+
+    // Si se actualizó el perfil, recargar los datos
+    if (result != null && result is Map<String, dynamic>) {
+      print('Perfil actualizado, recargando datos: $result');
+      setState(() {
+        _userData = result;
+      });
+      _loadUserProfile(); // Recargar los datos del perfil
     }
   }
 }

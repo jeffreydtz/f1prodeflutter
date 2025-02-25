@@ -551,13 +551,37 @@ class ApiService {
   Future<Map<String, dynamic>> updateUserProfile(
       Map<String, dynamic> body) async {
     try {
+      print('Actualizando perfil de usuario con datos: $body');
       final response = await _authenticatedRequest(
         'PATCH',
         profileEndpoint,
         body: body,
       );
 
+      print('Respuesta de actualización de perfil: $response');
+
       if (response is Map<String, dynamic>) {
+        // Si la respuesta contiene el perfil actualizado, actualizar el usuario actual
+        if (response.containsKey('profile') &&
+            response['profile'] is Map<String, dynamic>) {
+          final profileData = response['profile'];
+
+          // Actualizar el currentUser con los datos del perfil
+          currentUser = UserModel(
+            id: profileData['id']?.toString() ?? '',
+            username: profileData['username'] ?? 'Usuario',
+            email: profileData['email'] ?? '',
+            password: '',
+            points: profileData['points'] ?? 0,
+          );
+
+          print(
+              'Usuario actual actualizado después de edición: ${currentUser?.username}');
+
+          // Actualizar la caché
+          _saveToCache('user_profile', profileData);
+        }
+
         return response;
       } else {
         throw Exception('Formato de respuesta inválido');
@@ -1025,5 +1049,49 @@ class ApiService {
     }
 
     return currentUser;
+  }
+
+  Future<bool> checkAvailability(String fieldType, String value,
+      {String? currentUserId}) async {
+    try {
+      print('Verificando disponibilidad de $fieldType: $value');
+
+      final Map<String, dynamic> requestBody = {
+        'field_type': fieldType,
+        'value': value,
+      };
+
+      if (currentUserId != null) {
+        requestBody['current_user_id'] = currentUserId;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/users/check-availability/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print(
+          'Respuesta de verificación de disponibilidad: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        print('Datos de disponibilidad: $data');
+
+        if (data['success'] == true) {
+          return data['available'] == true;
+        }
+      }
+
+      // En caso de error, asumimos que está disponible para evitar bloquear al usuario
+      return true;
+    } catch (e) {
+      print('Error al verificar disponibilidad: ${e.toString()}');
+      // En caso de error, asumimos que está disponible para evitar bloquear al usuario
+      return true;
+    }
   }
 }

@@ -26,6 +26,11 @@ class ApiService {
   String? _accessToken;
   String? _refreshToken;
 
+  // Cache para evitar llamadas repetidas
+  Map<String, dynamic> _cache = {};
+  Map<String, DateTime> _cacheTimestamps = {};
+  static const Duration _cacheDuration = Duration(minutes: 5);
+
   // Endpoints
   static const String loginEndpoint = '/token/';
   static const String refreshEndpoint = '/token/refresh/';
@@ -95,6 +100,8 @@ class ApiService {
     try {
       final loginUrl = '$baseUrl$loginEndpoint';
       print('Intentando login con URL: $loginUrl');
+      print('Método: POST');
+      print('Credenciales: username=$username, password=***');
 
       final response = await http.post(
         Uri.parse(loginUrl),
@@ -110,6 +117,7 @@ class ApiService {
 
       print('Código de estado de respuesta login: ${response.statusCode}');
       print('Respuesta completa: ${response.body}');
+      print('Headers de respuesta: ${response.headers}');
 
       final data = jsonDecode(utf8.decode(response.bodyBytes));
 
@@ -119,6 +127,18 @@ class ApiService {
           accessToken: data['access'],
           refreshToken: data['refresh'],
         );
+
+        // Cargar el perfil del usuario inmediatamente después de iniciar sesión
+        try {
+          print('Cargando perfil después de login');
+          await _loadUserProfile();
+          print(
+              'Perfil cargado exitosamente después de login: ${currentUser?.username}');
+        } catch (profileError) {
+          print('Error al cargar perfil después de login: $profileError');
+          // Continuar aunque haya error al cargar el perfil
+        }
+
         print('Login completado para usuario: $username');
         return {'success': true};
       } else {
@@ -459,6 +479,29 @@ class ApiService {
   // 5. USER PROFILE
   // -------------------------------------------------
   Future<Map<String, dynamic>> _loadUserProfile() async {
+    const cacheKey = 'user_profile';
+
+    // Verificar si hay datos en caché
+    final cachedData = _getFromCache(cacheKey);
+    if (cachedData != null) {
+      print('Usando perfil de usuario en caché');
+
+      // Asegurarse de que currentUser esté actualizado con los datos en caché
+      if (currentUser == null && cachedData is Map<String, dynamic>) {
+        currentUser = UserModel(
+          id: cachedData['id']?.toString() ?? '',
+          username: cachedData['username'] ?? 'Usuario',
+          email: cachedData['email'] ?? '',
+          password: '',
+          points: cachedData['points'] ?? 0,
+        );
+        print(
+            'Usuario actual actualizado desde caché: ${currentUser?.username}');
+      }
+
+      return cachedData;
+    }
+
     print('Cargando perfil de usuario desde: $baseUrl$profileEndpoint');
     try {
       final response = await _authenticatedRequest(
@@ -469,6 +512,20 @@ class ApiService {
       final profileData = response;
       if (profileData != null && profileData is Map<String, dynamic>) {
         print('Perfil cargado exitosamente: ${profileData['username']}');
+
+        // Actualizar el currentUser con los datos del perfil
+        currentUser = UserModel(
+          id: profileData['id']?.toString() ?? '',
+          username: profileData['username'] ?? 'Usuario',
+          email: profileData['email'] ?? '',
+          password: '',
+          points: profileData['points'] ?? 0,
+        );
+
+        print('Usuario actual actualizado: ${currentUser?.username}');
+
+        // Guardar en caché
+        _saveToCache(cacheKey, profileData);
         return profileData;
       } else {
         print('Respuesta de perfil no contiene datos: $profileData');
@@ -482,16 +539,9 @@ class ApiService {
 
   Future<Map<String, dynamic>> getUserProfile() async {
     try {
-      final response = await _authenticatedRequest(
-        'GET',
-        profileEndpoint,
-      );
-
-      if (response is Map<String, dynamic>) {
-        return response;
-      } else {
-        throw Exception('Formato de respuesta inválido');
-      }
+      // Intentar cargar el perfil
+      final profileData = await _loadUserProfile();
+      return profileData;
     } catch (e) {
       print('Error al obtener perfil: ${e.toString()}');
       rethrow;
@@ -522,17 +572,56 @@ class ApiService {
   // 6. RACES
   // -------------------------------------------------
   Future<List<Race>> getRaces() async {
+    const cacheKey = 'races';
+
+    // Verificar si hay datos en caché
+    final cachedData = _getFromCache(cacheKey);
+    if (cachedData != null) {
+      return cachedData;
+    }
+
     try {
+      print('Solicitando carreras del servidor (no en caché)');
       final response = await _authenticatedRequest(
         'GET',
         racesEndpoint,
       );
 
+      print('Respuesta de carreras: $response');
+
+      List<Race> results = [];
+
       if (response is List) {
-        return response.map((raceData) => Race.fromJson(raceData)).toList();
+        print('Respuesta es una lista con ${response.length} elementos');
+        results = response.map((raceData) => Race.fromJson(raceData)).toList();
+      } else if (response is Map<String, dynamic>) {
+        print('Respuesta es un objeto: ${response.keys}');
+        // Intentar encontrar una propiedad que contenga la lista de carreras
+        if (response.containsKey('races') && response['races'] is List) {
+          final List<dynamic> races = response['races'];
+          print(
+              'Encontrada lista de carreras en propiedad "races" con ${races.length} elementos');
+          results = races.map((raceData) => Race.fromJson(raceData)).toList();
+        } else if (response.containsKey('results') &&
+            response['results'] is List) {
+          final List<dynamic> responseResults = response['results'];
+          print(
+              'Encontrada lista de carreras en propiedad "results" con ${responseResults.length} elementos');
+          results = responseResults
+              .map((raceData) => Race.fromJson(raceData))
+              .toList();
+        } else {
+          // Si no hay carreras, devolver una lista vacía
+          print('No se encontró una lista de carreras en la respuesta');
+        }
       } else {
+        print('Formato de respuesta inesperado: ${response.runtimeType}');
         throw Exception('Formato de respuesta inválido');
       }
+
+      // Guardar en caché
+      _saveToCache(cacheKey, results);
+      return results;
     } catch (e) {
       print('Error al obtener carreras: ${e.toString()}');
       rethrow;
@@ -550,9 +639,32 @@ class ApiService {
         endpoint,
       );
 
+      print('Respuesta de pilotos: $response');
+
       if (response is List) {
+        print('Respuesta es una lista con ${response.length} elementos');
         return response.map((driver) => driver.toString()).toList();
+      } else if (response is Map<String, dynamic>) {
+        print('Respuesta es un objeto: ${response.keys}');
+        // Intentar encontrar una propiedad que contenga la lista de pilotos
+        if (response.containsKey('drivers') && response['drivers'] is List) {
+          final List<dynamic> drivers = response['drivers'];
+          print(
+              'Encontrada lista de pilotos en propiedad "drivers" con ${drivers.length} elementos');
+          return drivers.map((driver) => driver.toString()).toList();
+        } else if (response.containsKey('results') &&
+            response['results'] is List) {
+          final List<dynamic> results = response['results'];
+          print(
+              'Encontrada lista de pilotos en propiedad "results" con ${results.length} elementos');
+          return results.map((driver) => driver.toString()).toList();
+        } else {
+          // Si no hay pilotos, devolver una lista vacía
+          print('No se encontró una lista de pilotos en la respuesta');
+          return [];
+        }
       } else {
+        print('Formato de respuesta inesperado: ${response.runtimeType}');
         throw Exception('Formato de respuesta inválido');
       }
     } catch (e) {
@@ -565,17 +677,57 @@ class ApiService {
   // 8. BETS
   // -------------------------------------------------
   Future<List<BetResult>> getUserBetResults() async {
+    const cacheKey = 'user_bets';
+
+    // Verificar si hay datos en caché
+    final cachedData = _getFromCache(cacheKey);
+    if (cachedData != null) {
+      return cachedData;
+    }
+
     try {
+      print('Solicitando apuestas del servidor (no en caché)');
       final response = await _authenticatedRequest(
         'GET',
         betsEndpoint,
       );
 
+      print('Respuesta de apuestas: $response');
+
+      List<BetResult> results = [];
+
       if (response is List) {
-        return response.map((betData) => BetResult.fromJson(betData)).toList();
+        print('Respuesta es una lista con ${response.length} elementos');
+        results =
+            response.map((betData) => BetResult.fromJson(betData)).toList();
+      } else if (response is Map<String, dynamic>) {
+        print('Respuesta es un objeto: ${response.keys}');
+        // Intentar encontrar una propiedad que contenga la lista de apuestas
+        if (response.containsKey('bets') && response['bets'] is List) {
+          final List<dynamic> bets = response['bets'];
+          print(
+              'Encontrada lista de apuestas en propiedad "bets" con ${bets.length} elementos');
+          results = bets.map((betData) => BetResult.fromJson(betData)).toList();
+        } else if (response.containsKey('results') &&
+            response['results'] is List) {
+          final List<dynamic> responseResults = response['results'];
+          print(
+              'Encontrada lista de apuestas en propiedad "results" con ${responseResults.length} elementos');
+          results = responseResults
+              .map((betData) => BetResult.fromJson(betData))
+              .toList();
+        } else {
+          // Si no hay apuestas, devolver una lista vacía
+          print('No se encontró una lista de apuestas en la respuesta');
+        }
       } else {
+        print('Formato de respuesta inesperado: ${response.runtimeType}');
         throw Exception('Formato de respuesta inválido');
       }
+
+      // Guardar en caché
+      _saveToCache(cacheKey, results);
+      return results;
     } catch (e) {
       print('Error al obtener resultados de apuestas: ${e.toString()}');
       rethrow;
@@ -630,19 +782,61 @@ class ApiService {
   // 9. TOURNAMENTS
   // -------------------------------------------------
   Future<List<Tournament>> getTournaments() async {
+    const cacheKey = 'tournaments';
+
+    // Verificar si hay datos en caché
+    final cachedData = _getFromCache(cacheKey);
+    if (cachedData != null) {
+      return cachedData;
+    }
+
     try {
+      print('Solicitando torneos del servidor (no en caché)');
       final response = await _authenticatedRequest(
         'GET',
         tournamentsEndpoint,
       );
 
+      print('Respuesta de torneos: $response');
+
+      List<Tournament> results = [];
+
       if (response is List) {
-        return response
+        print('Respuesta es una lista con ${response.length} elementos');
+        results = response
             .map((tournamentData) => Tournament.fromJson(tournamentData))
             .toList();
+      } else if (response is Map<String, dynamic>) {
+        print('Respuesta es un objeto: ${response.keys}');
+        // Intentar encontrar una propiedad que contenga la lista de torneos
+        if (response.containsKey('tournaments') &&
+            response['tournaments'] is List) {
+          final List<dynamic> tournaments = response['tournaments'];
+          print(
+              'Encontrada lista de torneos en propiedad "tournaments" con ${tournaments.length} elementos');
+          results = tournaments
+              .map((tournamentData) => Tournament.fromJson(tournamentData))
+              .toList();
+        } else if (response.containsKey('results') &&
+            response['results'] is List) {
+          final List<dynamic> responseResults = response['results'];
+          print(
+              'Encontrada lista de torneos en propiedad "results" con ${responseResults.length} elementos');
+          results = responseResults
+              .map((tournamentData) => Tournament.fromJson(tournamentData))
+              .toList();
+        } else {
+          // Si no hay torneos, devolver una lista vacía
+          print('No se encontró una lista de torneos en la respuesta');
+        }
       } else {
+        print('Formato de respuesta inesperado: ${response.runtimeType}');
         throw Exception('Formato de respuesta inválido');
       }
+
+      // Guardar en caché
+      _saveToCache(cacheKey, results);
+      return results;
     } catch (e) {
       print('Error al obtener torneos: ${e.toString()}');
       rethrow;
@@ -707,10 +901,12 @@ class ApiService {
   Future<void> logout() async {
     print('Iniciando proceso de logout');
     await _clearTokens();
+    clearCache(); // Limpiar caché al cerrar sesión
     print('Logout completado');
   }
 
   Future<bool> isLoggedIn() async {
+    print('Verificando si el usuario está logueado...');
     final token = await _getAccessToken();
     if (token == null) {
       print('No hay token de acceso disponible');
@@ -721,6 +917,7 @@ class ApiService {
       // Verificar si el token está expirado
       final isExpired = JwtDecoder.isExpired(token);
       print('Token de acceso expirado: $isExpired');
+      print('Token: ${token.substring(0, 10)}...');
 
       if (isExpired) {
         // Intentar refrescar el token
@@ -775,5 +972,58 @@ class ApiService {
       print('Error al obtener ID de usuario: ${e.toString()}');
       return null;
     }
+  }
+
+  // Método para limpiar la caché
+  void clearCache() {
+    print('Limpiando caché de datos');
+    _cache.clear();
+    _cacheTimestamps.clear();
+  }
+
+  // Método para verificar si un dato en caché es válido
+  bool _isCacheValid(String key) {
+    if (!_cache.containsKey(key) || !_cacheTimestamps.containsKey(key)) {
+      return false;
+    }
+
+    final timestamp = _cacheTimestamps[key]!;
+    final now = DateTime.now();
+    return now.difference(timestamp) < _cacheDuration;
+  }
+
+  // Método para guardar datos en caché
+  void _saveToCache(String key, dynamic data) {
+    _cache[key] = data;
+    _cacheTimestamps[key] = DateTime.now();
+    print('Datos guardados en caché: $key');
+  }
+
+  // Método para obtener datos de caché
+  dynamic _getFromCache(String key) {
+    if (_isCacheValid(key)) {
+      print('Usando datos en caché para: $key');
+      return _cache[key];
+    }
+    return null;
+  }
+
+  // Método para obtener el usuario actual
+  UserModel? getCurrentUser() {
+    if (currentUser == null) {
+      print('getCurrentUser: No hay usuario actual en memoria');
+      // Intentar cargar el perfil de forma asíncrona si no está disponible
+      _loadUserProfile().then((profile) {
+        // El perfil ya se actualiza en _loadUserProfile
+        print('Perfil cargado asíncronamente: ${currentUser?.username}');
+      }).catchError((e) {
+        print('Error al cargar perfil asíncronamente: $e');
+      });
+    } else {
+      print(
+          'getCurrentUser: Devolviendo usuario en memoria: ${currentUser?.username}');
+    }
+
+    return currentUser;
   }
 }

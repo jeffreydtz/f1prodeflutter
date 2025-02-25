@@ -20,6 +20,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Race> races = [];
   List<BetResult> betResults = [];
   bool _loading = true;
+  bool _hasError = false;
+  String? _errorMessage;
   int _selectedIndex = 0;
 
   @override
@@ -29,8 +31,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchInitialData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _loading = true;
+      _hasError = false;
+      _errorMessage = null;
+    });
+
     try {
-      // Hacer ambas llamadas en paralelo
+      print('Cargando datos iniciales en HomeScreen');
+
+      // Hacer ambas llamadas en paralelo - ahora utilizarán la caché si está disponible
       final results = await Future.wait([
         apiService.getRaces(),
         apiService.getUserBetResults(),
@@ -42,16 +54,27 @@ class _HomeScreenState extends State<HomeScreen> {
           betResults = results[1] as List<BetResult>;
           _loading = false;
         });
+
+        print(
+            'Datos cargados: ${races.length} carreras, ${betResults.length} apuestas');
       }
     } catch (e) {
+      print('Error al cargar datos iniciales: $e');
       if (mounted) {
         setState(() {
           _loading = false;
+          _hasError = true;
+          _errorMessage = e.toString();
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              textColor: Colors.white,
+              onPressed: _fetchInitialData,
+            ),
           ),
         );
       }
@@ -73,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: true,
         leading: Navigator.canPop(context)
             ? IconButton(
-                icon: Icon(
+                icon: const Icon(
                   Icons.arrow_back,
                   color: Colors.white,
                   size: 28,
@@ -81,64 +104,106 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _fetchInitialData,
+            tooltip: 'Actualizar datos',
+          ),
+        ],
         iconTheme: const IconThemeData(
-          color: Colors.white, // Esto asegura que los iconos sean blancos
-          size: 28, // Y que tengan un tamaño adecuado
+          color: Colors.white,
+          size: 28,
         ),
       ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
                   color: Color.fromARGB(255, 255, 17, 0)))
-          : ListView.builder(
-              padding: const EdgeInsets.all(8.0),
-              itemCount: races.length,
-              itemBuilder: (context, index) {
-                final race = races[index];
-                final hasPrediction =
-                    _checkExistingPrediction(race.season, race.round);
-                final raceDate = DateTime.parse(race.date);
-                final raceCompleted = raceDate.isBefore(DateTime.now());
+          : _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 60,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Error al cargar datos: $_errorMessage',
+                        style: const TextStyle(color: Colors.red),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _fetchInitialData,
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _fetchInitialData,
+                  child: races.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No hay carreras disponibles',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(8.0),
+                          itemCount: races.length,
+                          itemBuilder: (context, index) {
+                            final race = races[index];
+                            final hasPrediction = _checkExistingPrediction(
+                                race.season, race.round);
+                            final raceDate = DateTime.parse(race.date);
+                            final raceCompleted =
+                                raceDate.isBefore(DateTime.now());
 
-                return RaceCard(
-                  raceName: race.name,
-                  date: race.date,
-                  circuit: race.circuit,
-                  season: race.season,
-                  round: race.round,
-                  hasPrediction: hasPrediction,
-                  raceCompleted: raceCompleted,
-                  onBetPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => BetScreen(
-                          raceName: race.name,
-                          date: race.date,
-                          circuit: race.circuit,
-                          season: race.season,
-                          round: race.round,
-                          hasSprint: race.hasSprint,
+                            return RaceCard(
+                              raceName: race.name,
+                              date: race.date,
+                              circuit: race.circuit,
+                              season: race.season,
+                              round: race.round,
+                              hasPrediction: hasPrediction,
+                              raceCompleted: raceCompleted,
+                              onBetPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => BetScreen(
+                                      raceName: race.name,
+                                      date: race.date,
+                                      circuit: race.circuit,
+                                      season: race.season,
+                                      round: race.round,
+                                      hasSprint: race.hasSprint,
+                                    ),
+                                  ),
+                                ).then((_) {
+                                  // Actualizar los resultados cuando volvemos de hacer una predicción
+                                  _fetchInitialData();
+                                });
+                              },
+                              onViewResults: (season, round) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ResultsScreen(
+                                      initialRaceId: '${season}_$round',
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
                         ),
-                      ),
-                    ).then((_) {
-                      // Actualizar los resultados cuando volvemos de hacer una predicción
-                      _fetchInitialData();
-                    });
-                  },
-                  onViewResults: (season, round) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ResultsScreen(
-                          initialRaceId: '${season}_$round',
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                ),
       bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         shadowColor: Colors.transparent,

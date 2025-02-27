@@ -49,12 +49,28 @@ class ApiService {
   // -------------------------------------------------
   // 1. REGISTER (CREACIÓN DE USUARIO)
   // -------------------------------------------------
-  Future<Map<String, dynamic>> register(String username, String email,
-      String password, String passwordConfirm) async {
-    try {
+  Future<Map<String, dynamic>> register(
+      String username, 
+      String email,
+      String password, 
+      String passwordConfirm,
+      {String? avatarBase64}) async {
+    
       // Imprimir la URL para depuración
       final registerUrl = '$baseUrl$registerEndpoint';
       print('Intentando registro con URL: $registerUrl');
+
+      final Map<String, dynamic> requestBody = {
+        'username': username,
+        'email': email,
+        'password': password,
+        'password_confirm': passwordConfirm,
+      };
+
+      // Añadir avatar si se proporciona
+      if (avatarBase64 != null && avatarBase64.isNotEmpty) {
+        requestBody['avatar'] = avatarBase64;
+      }
 
       final response = await http.post(
         Uri.parse(registerUrl),
@@ -62,12 +78,7 @@ class ApiService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({
-          'username': username,
-          'email': email,
-          'password': password,
-          'password_confirm': passwordConfirm,
-        }),
+        body: jsonEncode(requestBody),
       );
 
       // Imprimir el código de estado para depuración
@@ -556,6 +567,7 @@ class ApiService {
           email: cachedData['email'] ?? '',
           password: '',
           points: cachedData['points'] ?? 0,
+          avatar: cachedData['avatar'],
         );
         print(
             'Usuario actual actualizado desde caché: ${currentUser?.username}');
@@ -585,6 +597,7 @@ class ApiService {
               profileData['total_points'] ?? profileData['points'] ?? 0,
           'races_played': profileData['races_played'] ?? 0,
           'poles_guessed': profileData['poles_guessed'] ?? 0,
+          'avatar': profileData['avatar'],
         };
 
         // Actualizar el currentUser con los datos del perfil
@@ -594,6 +607,7 @@ class ApiService {
           email: safeProfileData['email'],
           password: '',
           points: safeProfileData['points'],
+          avatar: safeProfileData['avatar'],
         );
 
         print('Usuario actual actualizado: ${currentUser?.username}');
@@ -628,6 +642,7 @@ class ApiService {
           'total_points': 0,
           'races_played': 0,
           'poles_guessed': 0,
+          'avatar': null,
         };
 
         // Actualizar el currentUser con datos por defecto
@@ -638,6 +653,7 @@ class ApiService {
             email: '',
             password: '',
             points: 0,
+            avatar: null,
           );
         }
 
@@ -674,6 +690,7 @@ class ApiService {
           'total_points': currentUser!.points,
           'races_played': 0,
           'poles_guessed': 0,
+          'avatar': currentUser!.avatar,
         };
         return fallbackProfile;
       }
@@ -688,6 +705,7 @@ class ApiService {
         'total_points': 0,
         'races_played': 0,
         'poles_guessed': 0,
+        'avatar': null,
       };
 
       // Actualizar el currentUser con datos por defecto
@@ -697,6 +715,7 @@ class ApiService {
         email: '',
         password: '',
         points: 0,
+        avatar: null,
       );
 
       return defaultProfile;
@@ -739,6 +758,7 @@ class ApiService {
             email: profileData['email'] ?? '',
             password: '',
             points: profileData['points'] ?? 0,
+            avatar: profileData['avatar'],
           );
 
           print(
@@ -1450,7 +1470,7 @@ class ApiService {
     try {
       final response = await _authenticatedRequest(
         'POST',
-        '$tournamentsEndpoint/join/',
+        'tournaments/join',
         body: {'inviteCode': inviteCode},
       );
 

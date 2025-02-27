@@ -4,6 +4,7 @@ class UserModel {
   final String username;
   final String password;
   int points;
+  String? avatar;
 
   UserModel({
     required this.id,
@@ -11,6 +12,7 @@ class UserModel {
     required this.username,
     required this.password,
     this.points = 0,
+    this.avatar,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class UserModel {
       email: json['email'] ?? '',
       password: '', // El backend no envía el password
       points: json['points'] ?? 0,
+      avatar: json['avatar'],
     );
   }
 }

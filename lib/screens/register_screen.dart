@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -17,13 +20,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false;
   String? _error;
+  Uint8List? _selectedImage;
+  String? _avatarBase64;
 
   // Instanciamos ApiService (singleton)
   final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _selectImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 400,
+      maxHeight: 400,
+      imageQuality: 75,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      final base64 = base64Encode(bytes);
+      setState(() {
+        _selectedImage = bytes;
+        _avatarBase64 =
+            'data:image/${image.name.split('.').last};base64,$base64';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Registro'),
       ),
@@ -31,6 +57,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // Imagen de perfil
+            GestureDetector(
+              onTap: _selectImage,
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color.fromARGB(255, 255, 4, 0),
+                    width: 2,
+                  ),
+                ),
+                child: _selectedImage != null
+                    ? ClipOval(
+                        child: Image.memory(
+                          _selectedImage!,
+                          fit: BoxFit.cover,
+                          width: 116,
+                          height: 116,
+                        ),
+                      )
+                    : Icon(
+                        Icons.add_a_photo,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Selecciona una foto de perfil',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: _usernameController,
               style: const TextStyle(color: Colors.white),
@@ -138,7 +200,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final response = await _apiService.register(
-          username, email, password, passwordConfirm);
+          username, email, password, passwordConfirm,
+          avatarBase64: _avatarBase64);
       setState(() => _isLoading = false);
 
       if (response['success']) {
@@ -164,6 +227,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             errorMessage = errors['password'].toString();
           } else if (errors.containsKey('password_confirm')) {
             errorMessage = errors['password_confirm'].toString();
+          } else if (errors.containsKey('avatar')) {
+            errorMessage = errors['avatar'].toString();
           } else if (errors.containsKey('detail')) {
             errorMessage = errors['detail'].toString();
           }

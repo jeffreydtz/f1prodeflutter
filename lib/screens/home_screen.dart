@@ -6,6 +6,8 @@ import '../models/betresult.dart';
 import '../widgets/race_card.dart';
 import '../screens/bet_screen.dart';
 import '../screens/results_screen.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/web_navbar.dart';
 import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
@@ -89,168 +91,210 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final currentYear = DateTime.now().year.toString();
+    final isWeb = ResponsiveLayout.isWeb(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Carreras $currentYear'),
-        automaticallyImplyLeading: true,
-        leading: Navigator.canPop(context)
-            ? IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                  size: 28,
+      appBar: isWeb
+          ? WebNavbar(
+              title: 'Carreras $currentYear',
+              onRefresh: _fetchInitialData,
+              showBackButton: Navigator.canPop(context),
+              onBackPressed: () => Navigator.of(context).pop(),
+              currentIndex: _selectedIndex,
+            )
+          : AppBar(
+              title: Text('Carreras $currentYear'),
+              automaticallyImplyLeading: true,
+              leading: Navigator.canPop(context)
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _fetchInitialData,
+                  tooltip: 'Actualizar datos',
                 ),
-                onPressed: () => Navigator.of(context).pop(),
-              )
-            : null,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchInitialData,
-            tooltip: 'Actualizar datos',
-          ),
-        ],
-        iconTheme: const IconThemeData(
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                  color: Color.fromARGB(255, 255, 17, 0)))
-          : _hasError
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 60,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Error al cargar datos: $_errorMessage',
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _fetchInitialData,
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
+              ],
+              iconTheme: const IconThemeData(
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+      body: _buildBody(),
+      bottomNavigationBar: isWeb
+          ? null
+          : BottomAppBar(
+              shape: const CircularNotchedRectangle(),
+              shadowColor: Colors.transparent,
+              color: Colors.grey[900],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 0;
+                      });
+                    },
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _fetchInitialData,
-                  child: races.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No hay carreras disponibles',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(8.0),
-                          itemCount: races.length,
-                          itemBuilder: (context, index) {
-                            final race = races[index];
-                            final hasPrediction = _checkExistingPrediction(
-                                race.season, race.round);
-                            final raceDate = DateTime.parse(race.date);
-                            final raceCompleted =
-                                raceDate.isBefore(DateTime.now());
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.list_number,
+                        color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 1;
+                      });
+                      Navigator.pushNamed(context, '/results');
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.person_3_fill,
+                        color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 2;
+                      });
+                      Navigator.pushNamed(context, '/tournaments');
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.profile_circled,
+                        color: Colors.white),
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 3;
+                      });
+                      Navigator.pushNamed(context, '/profile');
+                    },
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
 
-                            return RaceCard(
-                              raceName: race.name,
-                              date: race.date,
-                              circuit: race.circuit,
-                              season: race.season,
-                              round: race.round,
-                              hasPrediction: hasPrediction,
-                              raceCompleted: raceCompleted,
-                              onBetPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => BetScreen(
-                                      raceName: race.name,
-                                      date: race.date,
-                                      circuit: race.circuit,
-                                      season: race.season,
-                                      round: race.round,
-                                      hasSprint: race.hasSprint,
-                                    ),
-                                  ),
-                                ).then((_) {
-                                  // Actualizar los resultados cuando volvemos de hacer una predicción
-                                  _fetchInitialData();
-                                });
-                              },
-                              onViewResults: (season, round) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ResultsScreen(
-                                      initialRaceId: '${season}_$round',
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        shadowColor: Colors.transparent,
-        color: Colors.grey[900],
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+          child: CircularProgressIndicator(
+              color: Color.fromARGB(255, 255, 17, 0)));
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(
-              icon: const Icon(CupertinoIcons.home, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 0;
-                });
-              },
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 60,
             ),
-            IconButton(
-              icon: const Icon(CupertinoIcons.list_number, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 1;
-                });
-                Navigator.pushNamed(context, '/results');
-              },
+            const SizedBox(height: 16),
+            Text(
+              'Error al cargar datos: $_errorMessage',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
             ),
-            IconButton(
-              icon:
-                  const Icon(CupertinoIcons.person_3_fill, color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 2;
-                });
-                Navigator.pushNamed(context, '/tournaments');
-              },
-            ),
-            IconButton(
-              icon: const Icon(CupertinoIcons.profile_circled,
-                  color: Colors.white),
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = 3;
-                });
-                Navigator.pushNamed(context, '/profile');
-              },
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchInitialData,
+              child: const Text('Reintentar'),
             ),
           ],
         ),
-      ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchInitialData,
+      child: races.isEmpty
+          ? const Center(
+              child: Text(
+                'No hay carreras disponibles',
+                style: TextStyle(color: Colors.white),
+              ),
+            )
+          : _buildRacesList(),
+    );
+  }
+
+  Widget _buildRacesList() {
+    final isWeb = ResponsiveLayout.isWeb(context);
+
+    if (isWeb) {
+      // Layout mejorado para web: rejilla más ancha con más información
+      return GridView.builder(
+        padding: const EdgeInsets.all(16.0),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 1.8,
+          crossAxisSpacing: 12.0,
+          mainAxisSpacing: 12.0,
+        ),
+        itemCount: races.length,
+        itemBuilder: (context, index) => _buildRaceItem(index),
+      );
+    } else {
+      // Layout móvil: lista vertical
+      return ListView.builder(
+        padding: const EdgeInsets.all(8.0),
+        itemCount: races.length,
+        itemBuilder: (context, index) => _buildRaceItem(index),
+      );
+    }
+  }
+
+  Widget _buildRaceItem(int index) {
+    final race = races[index];
+    final hasPrediction = _checkExistingPrediction(race.season, race.round);
+    final raceDate = DateTime.parse(race.date);
+    final raceCompleted = raceDate.isBefore(DateTime.now());
+
+    return RaceCard(
+      raceName: race.name,
+      date: race.date,
+      circuit: race.circuit,
+      season: race.season,
+      round: race.round,
+      hasPrediction: hasPrediction,
+      raceCompleted: raceCompleted,
+      onBetPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BetScreen(
+              raceName: race.name,
+              date: race.date,
+              circuit: race.circuit,
+              season: race.season,
+              round: race.round,
+              hasSprint: race.hasSprint,
+            ),
+          ),
+        ).then((_) {
+          // Actualizar los resultados cuando volvemos de hacer una predicción
+          _fetchInitialData();
+        });
+      },
+      onViewResults: (season, round) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResultsScreen(
+              initialRaceId: '${season}_$round',
+            ),
+          ),
+        );
+      },
     );
   }
 }

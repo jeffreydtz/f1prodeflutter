@@ -1,7 +1,10 @@
 import 'package:f1prodeflutter/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../models/user.dart';
 import '../screens/edit_profile_screen.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/web_navbar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -11,11 +14,12 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final ApiService _apiService = ApiService();
-  bool _isLoading = true;
-  Map<String, dynamic>? _userData;
-  UserModel? _currentUser;
-  String? _error;
+  final ApiService apiService = ApiService();
+  UserModel? user;
+  Map<String, dynamic>? userData;
+  bool _loading = true;
+  bool _error = false;
+  int _selectedIndex = 3; // Perfil tab is selected
 
   @override
   void initState() {
@@ -24,89 +28,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserProfile() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    }
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
 
     try {
-      final ApiService apiService = ApiService();
-
-      // Verificar si hay un usuario actual
-      _currentUser = apiService.getCurrentUser();
-
-      final userData = await apiService.getUserProfile();
-
+      final profileData = await apiService.getUserProfile();
       if (mounted) {
         setState(() {
-          _userData = userData;
-          _isLoading = false;
-
-          // Extraer y mostrar la información del perfil
-          final username = _userData?['username'] ?? 'Usuario';
-          final email = _userData?['email'] ?? 'No disponible';
-          final points = _userData?['total_points']?.toString() ?? '0';
-
-          // Si el usuario actual tiene un nombre genérico pero tenemos datos reales, actualizarlo
-          if (_currentUser != null &&
-              _currentUser!.username == 'Usuario' &&
-              username != 'Usuario') {
-            _currentUser = UserModel(
-              id: _currentUser!.id,
-              username: username,
-              email: email,
-              password: '',
-              points: int.tryParse(points) ?? 0,
-            );
-
-            // Actualizar también el usuario en el ApiService
-            apiService.currentUser = _currentUser;
-          }
+          userData = profileData;
+          user = apiService.getCurrentUser();
+          _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          // Proporcionar un mensaje de error más amigable
-          String errorMsg = 'Error al cargar el perfil';
-
-          if (e.toString().contains('404')) {
-            errorMsg =
-                'No se encontró el perfil. El servidor puede estar en mantenimiento.';
-          } else if (e.toString().contains('HTML')) {
-            errorMsg =
-                'El servidor respondió con un formato incorrecto. Intente más tarde.';
-          } else if (e.toString().contains('conexión')) {
-            errorMsg = 'Error de conexión. Verifique su conexión a internet.';
-          } else {
-            errorMsg = 'Error al cargar el perfil: ${e.toString()}';
-          }
-
-          _error = errorMsg;
-          _isLoading = false;
-
-          // Si tenemos un usuario actual, usarlo como respaldo
-          if (_currentUser != null && _currentUser!.username != 'Usuario') {
-            _userData = {
-              'id': _currentUser!.id,
-              'username': _currentUser!.username,
-              'email': _currentUser!.email,
-              'points': _currentUser!.points,
-              'total_points': _currentUser!.points,
-              'races_played': 0,
-              'poles_guessed': 0,
-            };
-          }
+          _loading = false;
+          _error = true;
         });
-
-        // Mostrar un mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('No se pudo cargar el perfil: ${e.toString()}'),
+            content: Text('Error al cargar el perfil: $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -115,178 +60,217 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = ResponsiveLayout.isWeb(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Perfil de Piloto'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _error = null;
-              });
-              _loadUserProfile();
-            },
-            tooltip: 'Actualizar perfil',
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _loadUserProfile,
-        child: _isLoading
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      color: Color.fromARGB(255, 255, 17, 0),
-                    ),
-                    SizedBox(height: 16),
-                    Text('Cargando perfil...'),
-                  ],
+      appBar: isWeb
+          ? WebNavbar(
+              title: 'Mi Perfil',
+              onRefresh: _loadUserProfile,
+              showBackButton: Navigator.canPop(context),
+              onBackPressed: () => Navigator.of(context).pop(),
+              currentIndex: _selectedIndex,
+            )
+          : AppBar(
+              title: const Text('Mi Perfil'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadUserProfile,
+                  tooltip: 'Actualizar perfil',
                 ),
-              )
-            : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 60,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error al cargar el perfil',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _loadUserProfile,
-                          child: const Text('Reintentar'),
-                        ),
-                      ],
-                    ),
-                  )
-                : _buildProfileContent(),
-      ),
+              ],
+            ),
+      body: _buildBody(),
+      bottomNavigationBar: isWeb
+          ? null
+          : BottomAppBar(
+              shape: const CircularNotchedRectangle(),
+              color: Colors.grey[900],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/home'),
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.list_number,
+                        color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/results'),
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.person_3_fill,
+                        color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/tournaments'),
+                  ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.profile_circled,
+                        color: Colors.white),
+                    onPressed: null, // Ya estamos en perfil
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
-  Widget _buildProfileContent() {
-    // Extraer datos del perfil con valores por defecto
-    final username = _userData?['username'] ?? 'Usuario';
-    final email = _userData?['email'] ?? 'No disponible';
-    final totalPoints = _userData?['total_points'] ?? 0;
-    final racesPlayed = _userData?['races_played'] ?? 0;
-    final polesGuessed = _userData?['poles_guessed'] ?? 0;
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color.fromARGB(255, 255, 17, 0),
+        ),
+      );
+    }
+
+    if (_error || userData == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Error al cargar el perfil',
+              style: TextStyle(color: Colors.red),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadUserProfile,
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isWeb = ResponsiveLayout.isWeb(context);
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isWeb ? 32.0 : 16.0),
+      child: isWeb ? _buildWebProfileLayout() : _buildMobileProfileLayout(),
+    );
+  }
+
+  Widget _buildWebProfileLayout() {
+    final username = userData?['username'] ?? user?.username ?? 'Usuario';
+    final email = userData?['email'] ?? user?.email ?? '';
+    final name = userData?['name'] ?? '';
+    final country = userData?['country'] ?? '';
+    final favoriteTeam = userData?['favorite_team'] ?? '';
+    final ranking = userData?['ranking'] ?? 'N/A';
+    final points =
+        userData?['points'] ?? userData?['total_points'] ?? user?.points ?? 0;
+    final tournaments = userData?['tournaments_count'] ?? 0;
 
     return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar y nombre de usuario
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Color.fromARGB(255, 255, 17, 0),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              username,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: () => _navigateToEditProfile(),
-              icon: const Icon(Icons.edit),
-              label: const Text('Editar Perfil'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+            // Avatar y estadísticas
+            Expanded(
+              flex: 1,
+              child: Card(
+                color: Colors.grey[900],
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.grey[800],
+                        child: Text(
+                          _getInitials(),
+                          style: const TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildStatistic('Posición', '$ranking'),
+                      const SizedBox(height: 16),
+                      _buildStatistic('Puntos', '$points'),
+                      const SizedBox(height: 16),
+                      _buildStatistic('Torneos', '$tournaments'),
+                    ],
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 30),
-
-            // Estadísticas
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF212121),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    spreadRadius: 1,
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+            const SizedBox(width: 24),
+            // Información del perfil
+            Expanded(
+              flex: 2,
+              child: Card(
+                color: Colors.grey[900],
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        username,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildProfileInfo('Email', email),
+                      _buildProfileInfo(
+                          'Nombre', name != '' ? name : 'No especificado'),
+                      // Ocultamos estos campos hasta que estén implementados en el backend
+                      // _buildProfileInfo('País', country != '' ? country : 'No especificado'),
+                      // _buildProfileInfo('Equipo Favorito', favoriteTeam != '' ? favoriteTeam : 'No especificado'),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.edit),
+                          label: const Text('Editar Perfil'),
+                          onPressed: () => _navigateToEditProfile(),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color.fromARGB(255, 255, 17, 0),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.logout, color: Colors.white70),
+                          label: const Text('Cerrar Sesión',
+                              style: TextStyle(color: Colors.white70)),
+                          onPressed: () async {
+                            await apiService.logout();
+                            if (mounted) {
+                              Navigator.of(context)
+                                  .pushReplacementNamed('/login');
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.grey.shade700),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Estadísticas',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const Divider(
-                    thickness: 1.5,
-                    height: 30,
-                  ),
-                  _buildStatItem('#️⃣ Puntos totales', totalPoints.toString()),
-                  _buildStatItem('🏁 Carreras jugadas', racesPlayed.toString()),
-                  _buildStatItem('🏆 Poles acertadas', polesGuessed.toString()),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Botón para cerrar sesión
-            ElevatedButton.icon(
-              onPressed: () async {
-                await _apiService.logout();
-                if (mounted) {
-                  Navigator.of(context).pushReplacementNamed('/login');
-                }
-              },
-              icon: const Icon(Icons.logout),
-              label: const Text('Cerrar sesión'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                minimumSize: const Size(200, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
                 ),
               ),
             ),
@@ -296,31 +280,228 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
+  Widget _buildMobileProfileLayout() {
+    final username = userData?['username'] ?? user?.username ?? 'Usuario';
+    final email = userData?['email'] ?? user?.email ?? '';
+    final name = userData?['name'] ?? '';
+    final country = userData?['country'] ?? '';
+    final favoriteTeam = userData?['favorite_team'] ?? '';
+    final ranking = userData?['ranking'] ?? 'N/A';
+    final points =
+        userData?['points'] ?? userData?['total_points'] ?? user?.points ?? 0;
+    final tournaments = userData?['tournaments_count'] ?? 0;
+    final avatarUrl = userData?['avatar'] ?? user?.avatar;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Avatar y nombre
+        Center(
+          child: Column(
+            children: [
+              avatarUrl != null && avatarUrl.isNotEmpty
+                  ? CircleAvatar(
+                      radius: 50,
+                      backgroundImage: NetworkImage(avatarUrl),
+                      backgroundColor: Colors.grey[800],
+                    )
+                  : CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey[800],
+                      child: Text(
+                        _getInitials(),
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+              const SizedBox(height: 16),
+              Text(
+                username,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                email,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // Estadísticas
+        Card(
+          color: Colors.grey[900],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatColumn('Posición', '$ranking'),
+                _buildStatColumn('Puntos', '$points'),
+                _buildStatColumn('Torneos', '$tournaments'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Información de perfil
+        const Text(
+          'Información de Perfil',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildProfileInfoRow('Nombre', name != '' ? name : 'No especificado'),
+        // Ocultamos estos campos hasta que estén implementados en el backend
+        // _buildProfileInfoRow('País', country != '' ? country : 'No especificado'),
+        // _buildProfileInfoRow('Equipo Favorito', favoriteTeam != '' ? favoriteTeam : 'No especificado'),
+        const SizedBox(height: 32),
+
+        // Botón de editar
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            icon: const Icon(Icons.edit),
+            label: const Text('Editar Perfil'),
+            onPressed: () => _navigateToEditProfile(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.logout, color: Colors.white70),
+            label: const Text('Cerrar Sesión',
+                style: TextStyle(color: Colors.white70)),
+            onPressed: () async {
+              await apiService.logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
+            },
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.grey.shade700),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatistic(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatColumn(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[400],
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileInfo(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 14,
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 255, 17, 0),
-              borderRadius: BorderRadius.circular(15),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 16,
+              ),
+            ),
+          ),
+          Expanded(
             child: Text(
               value,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -329,8 +510,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _navigateToEditProfile() async {
-    if (_userData == null) {
+  String _getInitials() {
+    final username = userData?['username'] ?? user?.username ?? '';
+    final name = userData?['name'] ?? '';
+
+    if (name.isNotEmpty) {
+      final nameParts = name.split(' ');
+      if (nameParts.length > 1) {
+        return '${nameParts[0][0]}${nameParts[1][0]}'.toUpperCase();
+      } else if (nameParts.isNotEmpty) {
+        return nameParts[0][0].toUpperCase();
+      }
+    }
+
+    if (username.isNotEmpty) {
+      return username[0].toUpperCase();
+    }
+
+    return 'U';
+  }
+
+  void _navigateToEditProfile() {
+    if (userData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No se pudo cargar la información del perfil'),
@@ -340,19 +541,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final result = await Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(userData: _userData!),
+        builder: (context) => EditProfileScreen(userData: userData!),
       ),
-    );
-
-    // Si se actualizó el perfil, recargar los datos
-    if (result != null && result is Map<String, dynamic>) {
-      setState(() {
-        _userData = result;
-      });
-      _loadUserProfile(); // Recargar los datos del perfil
-    }
+    ).then((_) => _loadUserProfile());
   }
 }

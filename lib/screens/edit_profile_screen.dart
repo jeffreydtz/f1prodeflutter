@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -13,6 +16,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
+  final ImagePicker _picker = ImagePicker();
 
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
@@ -27,6 +31,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _emailAvailable = true;
   bool _checkingUsername = false;
   bool _checkingEmail = false;
+  Uint8List? _selectedImage;
+  String? _avatarBase64;
+  String? _currentAvatarUrl;
 
   @override
   void initState() {
@@ -38,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _currentPasswordController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
+    _currentAvatarUrl = widget.userData['avatar'];
   }
 
   @override
@@ -48,6 +56,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 400,
+      maxHeight: 400,
+      imageQuality: 75,
+    );
+
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      final base64 = base64Encode(bytes);
+      setState(() {
+        _selectedImage = bytes;
+        _avatarBase64 =
+            'data:image/${image.name.split('.').last};base64,$base64';
+      });
+    }
   }
 
   Future<void> _checkUsernameAvailability(String username) async {
@@ -152,6 +179,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'email': _emailController.text,
       };
 
+      // Añadir avatar si se ha seleccionado una nueva imagen
+      if (_avatarBase64 != null) {
+        updateData['avatar'] = _avatarBase64;
+      }
+
       // Añadir datos de contraseña si se está cambiando
       if (_changePassword) {
         updateData['current_password'] = _currentPasswordController.text;
@@ -216,8 +248,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text('Editar Perfil'),
+        backgroundColor: Colors.black,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -228,258 +262,324 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Color.fromARGB(255, 255, 17, 0),
-              ),
+              child: CircularProgressIndicator(),
             )
-          : SingleChildScrollView(
+          : Container(
               padding: const EdgeInsets.all(16.0),
               child: Form(
                 key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_error != null)
-                      Container(
-                        padding: const EdgeInsets.all(8.0),
-                        margin: const EdgeInsets.only(bottom: 16.0),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(8.0),
-                          border: Border.all(color: Colors.red),
-                        ),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-
-                    // Sección de información básica
-                    const Text(
-                      'Información básica',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Campo de nombre de usuario
-                    TextFormField(
-                      controller: _usernameController,
-                      decoration: InputDecoration(
-                        labelText: 'Nombre de usuario',
-                        hintText: 'Ingrese su nombre de usuario',
-                        prefixIcon: const Icon(Icons.person),
-                        suffixIcon: _checkingUsername
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Sección de avatar
+                      Center(
+                        child: Column(
+                          children: [
+                            GestureDetector(
+                              onTap: _selectImage,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color:
+                                        const Color.fromARGB(255, 255, 17, 0),
+                                    width: 2,
+                                  ),
                                 ),
-                              )
-                            : _usernameController.text.isNotEmpty &&
-                                    _usernameController.text !=
-                                        widget.userData['username']
-                                ? Icon(
-                                    _usernameAvailable
-                                        ? Icons.check_circle
-                                        : Icons.error,
-                                    color: _usernameAvailable
-                                        ? Colors.green
-                                        : Colors.red,
-                                  )
-                                : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingrese un nombre de usuario';
-                        }
-                        if (!_usernameAvailable) {
-                          return 'Este nombre de usuario ya está en uso';
-                        }
-                        return null;
-                      },
-                      onChanged: (value) {
-                        _checkUsernameAvailability(value);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Campo de correo electrónico
-                    TextFormField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: 'Correo electrónico',
-                        hintText: 'Ingrese su correo electrónico',
-                        prefixIcon: const Icon(Icons.email),
-                        suffixIcon: _checkingEmail
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                                child: _selectedImage != null
+                                    ? ClipOval(
+                                        child: Image.memory(
+                                          _selectedImage!,
+                                          fit: BoxFit.cover,
+                                          width: 116,
+                                          height: 116,
+                                        ),
+                                      )
+                                    : _currentAvatarUrl != null
+                                        ? ClipOval(
+                                            child: Image.network(
+                                              _currentAvatarUrl!,
+                                              fit: BoxFit.cover,
+                                              width: 116,
+                                              height: 116,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return Icon(
+                                                  Icons.person,
+                                                  color: Colors.white,
+                                                  size: 60,
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.person,
+                                            color: Colors.white,
+                                            size: 60,
+                                          ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: _selectImage,
+                              child: const Text(
+                                'Cambiar Foto',
+                                style: TextStyle(
+                                  color: Color.fromARGB(255, 255, 17, 0),
                                 ),
-                              )
-                            : _emailController.text.isNotEmpty &&
-                                    _emailController.text !=
-                                        widget.userData['email']
-                                ? Icon(
-                                    _emailAvailable
-                                        ? Icons.check_circle
-                                        : Icons.error,
-                                    color: _emailAvailable
-                                        ? Colors.green
-                                        : Colors.red,
-                                  )
-                                : null,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingrese un correo electrónico';
-                        }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                            .hasMatch(value)) {
-                          return 'Por favor ingrese un correo electrónico válido';
-                        }
-                        if (!_emailAvailable) {
-                          return 'Este correo electrónico ya está en uso';
-                        }
-                        return null;
-                      },
-                      onChanged: (value) {
-                        _checkEmailAvailability(value);
-                      },
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
-                    // Sección de cambio de contraseña
-                    Row(
-                      children: [
-                        const Text(
-                          'Cambiar contraseña',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                      if (_error != null)
+                        Container(
+                          padding: const EdgeInsets.all(8.0),
+                          margin: const EdgeInsets.only(bottom: 16.0),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade100,
+                            borderRadius: BorderRadius.circular(8.0),
+                            border: Border.all(color: Colors.red),
+                          ),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Colors.red),
                           ),
                         ),
-                        const Spacer(),
-                        Switch(
-                          value: _changePassword,
-                          onChanged: (value) {
-                            setState(() {
-                              _changePassword = value;
-                            });
+
+                      // Sección de información básica
+                      const Text(
+                        'Información básica',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo de nombre de usuario
+                      TextFormField(
+                        controller: _usernameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nombre de usuario',
+                          hintText: 'Ingrese su nombre de usuario',
+                          prefixIcon: const Icon(Icons.person),
+                          suffixIcon: _checkingUsername
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : _usernameController.text.isNotEmpty &&
+                                      _usernameController.text !=
+                                          widget.userData['username']
+                                  ? Icon(
+                                      _usernameAvailable
+                                          ? Icons.check_circle
+                                          : Icons.error,
+                                      color: _usernameAvailable
+                                          ? Colors.green
+                                          : Colors.red,
+                                    )
+                                  : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor ingrese un nombre de usuario';
+                          }
+                          if (!_usernameAvailable) {
+                            return 'Este nombre de usuario ya está en uso';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          _checkUsernameAvailability(value);
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo de correo electrónico
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: InputDecoration(
+                          labelText: 'Correo electrónico',
+                          hintText: 'Ingrese su correo electrónico',
+                          prefixIcon: const Icon(Icons.email),
+                          suffixIcon: _checkingEmail
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : _emailController.text.isNotEmpty &&
+                                      _emailController.text !=
+                                          widget.userData['email']
+                                  ? Icon(
+                                      _emailAvailable
+                                          ? Icons.check_circle
+                                          : Icons.error,
+                                      color: _emailAvailable
+                                          ? Colors.green
+                                          : Colors.red,
+                                    )
+                                  : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor ingrese un correo electrónico';
+                          }
+                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                              .hasMatch(value)) {
+                            return 'Por favor ingrese un correo electrónico válido';
+                          }
+                          if (!_emailAvailable) {
+                            return 'Este correo electrónico ya está en uso';
+                          }
+                          return null;
+                        },
+                        onChanged: (value) {
+                          _checkEmailAvailability(value);
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Sección de cambio de contraseña
+                      Row(
+                        children: [
+                          const Text(
+                            'Cambiar contraseña',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          Switch(
+                            value: _changePassword,
+                            onChanged: (value) {
+                              setState(() {
+                                _changePassword = value;
+                              });
+                            },
+                            activeColor: const Color.fromARGB(255, 255, 17, 0),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (_changePassword) ...[
+                        // Campo de contraseña actual
+                        TextFormField(
+                          controller: _currentPasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Contraseña actual',
+                            hintText: 'Ingrese su contraseña actual',
+                            prefixIcon: const Icon(Icons.lock),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Por favor ingrese su contraseña actual';
+                            }
+                            return null;
                           },
-                          activeColor: const Color.fromARGB(255, 255, 17, 0),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Campo de nueva contraseña
+                        TextFormField(
+                          controller: _newPasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Nueva contraseña',
+                            hintText: 'Ingrese su nueva contraseña',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Por favor ingrese una nueva contraseña';
+                            }
+                            if (value.length < 8) {
+                              return 'La contraseña debe tener al menos 8 caracteres';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Campo de confirmación de nueva contraseña
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: 'Confirmar nueva contraseña',
+                            hintText: 'Confirme su nueva contraseña',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Por favor confirme su nueva contraseña';
+                            }
+                            if (value != _newPasswordController.text) {
+                              return 'Las contraseñas no coinciden';
+                            }
+                            return null;
+                          },
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 16),
 
-                    if (_changePassword) ...[
-                      // Campo de contraseña actual
-                      TextFormField(
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña actual',
-                          hintText: 'Ingrese su contraseña actual',
-                          prefixIcon: const Icon(Icons.lock),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
+                      const SizedBox(height: 32),
+
+                      // Botón de guardar cambios
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _updateProfile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                const Color.fromARGB(255, 255, 17, 0),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.0),
+                            ),
+                          ),
+                          child: const Text(
+                            'GUARDAR CAMBIOS',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese su contraseña actual';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Campo de nueva contraseña
-                      TextFormField(
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Nueva contraseña',
-                          hintText: 'Ingrese su nueva contraseña',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor ingrese una nueva contraseña';
-                          }
-                          if (value.length < 8) {
-                            return 'La contraseña debe tener al menos 8 caracteres';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Campo de confirmación de nueva contraseña
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: 'Confirmar nueva contraseña',
-                          hintText: 'Confirme su nueva contraseña',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor confirme su nueva contraseña';
-                          }
-                          if (value != _newPasswordController.text) {
-                            return 'Las contraseñas no coinciden';
-                          }
-                          return null;
-                        },
                       ),
                     ],
-
-                    const SizedBox(height: 32),
-
-                    // Botón de guardar cambios
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _updateProfile,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 255, 17, 0),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                        ),
-                        child: const Text(
-                          'GUARDAR CAMBIOS',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../models/tournament.dart';
 import '../widgets/tournament_card.dart';
 import 'tournament_details_screen.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/web_navbar.dart';
 
 class TournamentsScreen extends StatefulWidget {
   const TournamentsScreen({Key? key}) : super(key: key);
@@ -14,7 +17,9 @@ class TournamentsScreen extends StatefulWidget {
 class _TournamentsScreenState extends State<TournamentsScreen> {
   final ApiService apiService = ApiService();
   List<Tournament> tournaments = [];
-  bool _loading = true;
+  bool isLoading = true;
+  String? error;
+  int _selectedIndex = 2; // Tournaments tab is selected
 
   final TextEditingController _tournamentNameController =
       TextEditingController();
@@ -31,11 +36,12 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       final data = await apiService.getTournaments();
       setState(() {
         tournaments = data;
-        _loading = false;
+        isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _loading = false;
+        isLoading = false;
+        error = e.toString();
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -114,141 +120,309 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     }
   }
 
+  void _showTournamentActionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '¿Qué deseas hacer?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.add_circle, color: Colors.white),
+              title: const Text('Crear un nuevo torneo',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showCreateTournamentDialog(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group_add, color: Colors.white),
+              title: const Text('Unirse a un torneo',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showJoinTournamentDialog(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateTournamentDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Crear Nuevo Torneo',
+            style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: _tournamentNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Nombre del Torneo',
+            labelStyle: const TextStyle(color: Colors.white54),
+            filled: true,
+            fillColor: Colors.grey[800],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _createTournament();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+            ),
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showJoinTournamentDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Unirse a un Torneo',
+            style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: _inviteCodeController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Código de Invitación',
+            labelStyle: const TextStyle(color: Colors.white54),
+            filled: true,
+            fillColor: Colors.grey[800],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _joinTournament();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+            ),
+            child: const Text('Unirse'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isWeb = ResponsiveLayout.isWeb(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Torneos'),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                  color: Color.fromARGB(255, 255, 17, 1)))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      appBar: isWeb
+          ? WebNavbar(
+              title: 'Torneos',
+              onRefresh: _fetchTournaments,
+              showBackButton: Navigator.canPop(context),
+              onBackPressed: () => Navigator.of(context).pop(),
+              currentIndex: _selectedIndex,
+            )
+          : AppBar(
+              title: const Text('Torneos'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _fetchTournaments,
+                ),
+              ],
+            ),
+      body: _buildBody(),
+      bottomNavigationBar: isWeb
+          ? null
+          : BottomAppBar(
+              shape: const CircularNotchedRectangle(),
+              color: Colors.grey[900],
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Crear Torneo
-                  const Text(
-                    'Crear Nuevo Torneo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/home'),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _tournamentNameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Nombre del Torneo',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: Colors.grey[800],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.list_number,
+                        color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/results'),
                   ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _createTournament,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 255, 17, 0),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Crear Torneo',
-                          style: TextStyle(color: Colors.white)),
-                    ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.person_3_fill,
+                        color: Colors.white),
+                    onPressed: null, // Ya estamos en torneos
                   ),
-
-                  const Divider(
-                      color: Colors.white54, thickness: 1, height: 30),
-
-                  // Unirse a Torneo
-                  const Text(
-                    'Unirse a un Torneo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  IconButton(
+                    icon: const Icon(CupertinoIcons.profile_circled,
+                        color: Colors.white),
+                    onPressed: () =>
+                        Navigator.pushReplacementNamed(context, '/profile'),
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _inviteCodeController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Código de Invitación',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: Colors.grey[800],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _joinTournament,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 255, 17, 0),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Unirse a Torneo',
-                          style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // Lista de torneos
-                  const Text(
-                    'Mis Torneos',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (tournaments.isEmpty)
-                    const Center(
-                      child: Text(
-                        'No estás participando en ningún torneo',
-                        style: TextStyle(color: Colors.white54),
-                      ),
-                    )
-                  else
-                    ...tournaments.map(
-                      (t) => TournamentCard(
-                        name: t.name,
-                        inviteCode: t.inviteCode,
-                        participantsCount: t.participants.length,
-                        position: t.userPosition,
-                        points: t.userPoints,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  TournamentDetailsScreen(tournament: t),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                 ],
               ),
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showTournamentActionSheet(context),
+        backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    if (isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color.fromARGB(255, 255, 17, 0),
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Error: $error',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchTournaments,
+              child: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildTournamentsList();
+  }
+
+  Widget _buildTournamentsList() {
+    final isWeb = ResponsiveLayout.isWeb(context);
+
+    if (tournaments.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.emoji_events_outlined,
+              color: Colors.grey,
+              size: 60,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No hay torneos disponibles',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _fetchTournaments,
+              child: const Text('Actualizar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isWeb) {
+      // Layout para web: rejilla de tarjetas
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 12.0,
+            mainAxisSpacing: 12.0,
+            childAspectRatio: 1.6,
+          ),
+          itemCount: tournaments.length,
+          itemBuilder: (context, index) =>
+              _buildTournamentCard(tournaments[index]),
+        ),
+      );
+    } else {
+      // Layout para móvil: lista vertical
+      return Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: ListView.builder(
+          itemCount: tournaments.length,
+          itemBuilder: (context, index) =>
+              _buildTournamentCard(tournaments[index]),
+        ),
+      );
+    }
+  }
+
+  Widget _buildTournamentCard(Tournament tournament) {
+    return TournamentCard(
+      name: tournament.name,
+      inviteCode: tournament.inviteCode,
+      participantsCount: tournament.participants?.length ?? 0,
+      position: tournament.userPosition ?? 0,
+      points: tournament.userPoints ?? 0,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TournamentDetailsScreen(
+              tournament: tournament,
+            ),
+          ),
+        ).then((_) => _fetchTournaments());
+      },
     );
   }
 }

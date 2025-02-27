@@ -124,6 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _usernameController,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildTextFieldDecoration('Username'),
+                              onSubmitted: (_) => _login(),
                             ),
                             const SizedBox(height: 20),
                             // Campo password
@@ -132,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: const TextStyle(color: Colors.white),
                               obscureText: true,
                               decoration: _buildTextFieldDecoration('Password'),
+                              onSubmitted: (_) => _login(),
                             ),
                             const SizedBox(height: 20),
                             _isLoading

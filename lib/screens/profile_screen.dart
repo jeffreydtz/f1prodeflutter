@@ -34,24 +34,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final profileData = await apiService.getUserProfile();
-      if (mounted) {
+      // Primero intentamos obtener el usuario actual desde la API en memoria
+      UserModel? userFromMemory = apiService.getCurrentUser();
+
+      // Si existe un usuario en memoria, actualizar con esos datos primero
+      if (userFromMemory != null) {
         setState(() {
-          userData = profileData;
-          user = apiService.getCurrentUser();
-          _loading = false;
+          user = userFromMemory;
+          // Mostrar los datos que tenemos mientras cargamos la información completa
+          userData = {
+            'id': userFromMemory.id,
+            'username': userFromMemory.username,
+            'email': userFromMemory.email,
+            'points': userFromMemory.points,
+          };
         });
       }
+
+      // Luego hacemos la solicitud al servidor para obtener datos actualizados
+      final profileData = await apiService.getUserProfile();
+
+      // Verificamos si hay datos válidos
+      if (profileData != null &&
+          profileData is Map<String, dynamic> &&
+          profileData.isNotEmpty) {
+        // Mostrar datos para debug
+        debugPrint('Profile data loaded: $profileData');
+
+        if (mounted) {
+          setState(() {
+            userData = profileData;
+            // Volver a obtener el usuario actual (que ahora debería estar actualizado)
+            user = apiService.getCurrentUser();
+            _loading = false;
+          });
+        }
+      } else {
+        // Si no se obtuvieron datos válidos del perfil pero tenemos un usuario en memoria
+        if (mounted && userFromMemory != null) {
+          setState(() {
+            _loading = false;
+          });
+        } else if (mounted) {
+          // Si no tenemos datos del servidor ni usuario en memoria, mostrar error
+          setState(() {
+            _loading = false;
+            _error = true;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No se pudieron cargar datos del perfil'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      if (mounted) {
+      debugPrint('Error loading profile: $e');
+
+      // Si hubo un error pero tenemos datos cargados anteriormente, no mostrar error
+      if (mounted && userData != null) {
+        setState(() {
+          _loading = false;
+        });
+
+        // Mostrar mensaje de error más discreto si ya tenemos datos
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo actualizar el perfil: $e'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else if (mounted) {
+        // Si no tenemos datos previos, mostrar pantalla de error
         setState(() {
           _loading = false;
           _error = true;
         });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar el perfil: $e'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
           ),
         );
       }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/betresult.dart';
 import '../models/user.dart';
@@ -211,24 +212,30 @@ class ApiService {
   // -------------------------------------------------
   Future<String?> _getAccessToken() async {
     if (_accessToken == null) {
-      final prefs = await _storage;
-      _accessToken = prefs.getString('access_token');
+      try {
+        final prefs = await _storage;
+        _accessToken = prefs.getString('access_token');
 
-      // Verificar si el token está por expirar
-      if (_accessToken != null) {
-        try {
-          final decodedToken = JwtDecoder.decode(_accessToken!);
-          final expiration =
-              DateTime.fromMillisecondsSinceEpoch(decodedToken['exp'] * 1000);
-          final now = DateTime.now();
+        // Verificar si el token está por expirar
+        if (_accessToken != null) {
+          try {
+            final decodedToken = JwtDecoder.decode(_accessToken!);
+            final expiration =
+                DateTime.fromMillisecondsSinceEpoch(decodedToken['exp'] * 1000);
+            final now = DateTime.now();
 
-          // Si el token expira en menos de 5 minutos, refrescarlo
-          if (expiration.difference(now).inMinutes < 5) {
+            // Si el token expira en menos de 5 minutos, refrescarlo
+            if (expiration.difference(now).inMinutes < 5) {
+              await _refreshAccessTokenFromServer();
+            }
+          } catch (e) {
+            // Si hay un error al decodificar, intentar refrescar de todas formas
             await _refreshAccessTokenFromServer();
           }
-        } catch (e) {
-          // Error al decodificar el token
         }
+      } catch (e) {
+        // Error accediendo a SharedPreferences, puede ocurrir en web móvil
+        // Intentar retornar el token en memoria si existe
       }
     }
     return _accessToken;
@@ -236,8 +243,12 @@ class ApiService {
 
   Future<String?> _getRefreshToken() async {
     if (_refreshToken == null) {
-      final prefs = await _storage;
-      _refreshToken = prefs.getString('refresh_token');
+      try {
+        final prefs = await _storage;
+        _refreshToken = prefs.getString('refresh_token');
+      } catch (e) {
+        // Error accediendo a SharedPreferences
+      }
     }
     return _refreshToken;
   }
@@ -271,85 +282,107 @@ class ApiService {
         return false;
       }
     } catch (e) {
-      await _clearTokens();
+      // No borrar tokens en caso de error de red para permitir reintentos
       return false;
     }
   }
 
   Future<void> _saveTokens({String? accessToken, String? refreshToken}) async {
-    final prefs = await _storage;
-    if (accessToken != null) {
-      await prefs.setString('access_token', accessToken);
-      _accessToken = accessToken;
+    try {
+      final prefs = await _storage;
 
-      // Extraer y guardar más información del usuario del token JWT
-      try {
-        final decodedToken = JwtDecoder.decode(accessToken);
-        if (decodedToken.containsKey('user_id')) {
-          final userId = decodedToken['user_id'].toString();
-          await prefs.setString('user_id', userId);
-
-          // Si hay más campos en el token, guardarlos también
-          if (decodedToken.containsKey('username')) {
-            await prefs.setString('username', decodedToken['username']);
-          }
-          if (decodedToken.containsKey('email')) {
-            await prefs.setString('email', decodedToken['email']);
-          }
-        }
-      } catch (e) {
-        // Ignorar errores al decodificar el token
+      // Actualizar en memoria primero para garantizar disponibilidad
+      if (accessToken != null) {
+        _accessToken = accessToken;
       }
-    }
-    if (refreshToken != null) {
-      await prefs.setString('refresh_token', refreshToken);
-      _refreshToken = refreshToken;
+      if (refreshToken != null) {
+        _refreshToken = refreshToken;
+      }
+
+      // Luego intentar guardar en persistencia
+      if (accessToken != null) {
+        await prefs.setString('access_token', accessToken);
+
+        // Extraer y guardar más información del usuario del token JWT
+        try {
+          final decodedToken = JwtDecoder.decode(accessToken);
+          if (decodedToken.containsKey('user_id')) {
+            final userId = decodedToken['user_id'].toString();
+            await prefs.setString('user_id', userId);
+
+            // Si hay más campos en el token, guardarlos también
+            if (decodedToken.containsKey('username')) {
+              await prefs.setString('username', decodedToken['username']);
+            }
+            if (decodedToken.containsKey('email')) {
+              await prefs.setString('email', decodedToken['email']);
+            }
+          }
+        } catch (e) {
+          // Ignorar errores al decodificar el token
+        }
+      }
+      if (refreshToken != null) {
+        await prefs.setString('refresh_token', refreshToken);
+      }
+    } catch (e) {
+      // Error guardando tokens, pero ya están en memoria
     }
   }
 
   Future<void> _loadTokens() async {
-    final prefs = await _storage;
-    _accessToken = prefs.getString('access_token');
-    _refreshToken = prefs.getString('refresh_token');
+    try {
+      final prefs = await _storage;
+      _accessToken = prefs.getString('access_token');
+      _refreshToken = prefs.getString('refresh_token');
 
-    // Intentar cargar datos del usuario desde SharedPreferences
-    if (_accessToken != null) {
-      final userId = prefs.getString('user_id');
-      final username = prefs.getString('username');
-      final email = prefs.getString('email');
-      final points = prefs.getInt('points') ?? 0;
-      final avatar = prefs.getString('avatar');
+      // Intentar cargar datos del usuario desde SharedPreferences
+      if (_accessToken != null) {
+        final userId = prefs.getString('user_id');
+        final username = prefs.getString('username');
+        final email = prefs.getString('email');
+        final points = prefs.getInt('points') ?? 0;
+        final avatar = prefs.getString('avatar');
 
-      if (userId != null && username != null) {
-        currentUser = UserModel(
-          id: userId,
-          username: username,
-          email: email ?? '',
-          password: '',
-          points: points,
-          avatar: avatar,
-        );
+        if (userId != null && username != null) {
+          currentUser = UserModel(
+            id: userId,
+            username: username,
+            email: email ?? '',
+            password: '',
+            points: points,
+            avatar: avatar,
+          );
 
-        // Guardar en caché
-        _saveToCache('user_profile', {
-          'id': userId,
-          'username': username,
-          'email': email ?? '',
-          'points': points,
-          'avatar': avatar,
-        });
+          // Guardar en caché
+          _saveToCache('user_profile', {
+            'id': userId,
+            'username': username,
+            'email': email ?? '',
+            'points': points,
+            'avatar': avatar,
+          });
+        }
       }
+    } catch (e) {
+      // Error cargando tokens, continuar con valores null
     }
   }
 
   Future<void> _clearTokens() async {
-    final prefs = await _storage;
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
-    await prefs.remove('user_id');
-    _accessToken = null;
-    _refreshToken = null;
-    currentUser = null;
+    try {
+      final prefs = await _storage;
+      await prefs.remove('access_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove('user_id');
+    } catch (e) {
+      // Error borrando tokens
+    } finally {
+      // Asegurar que se borren de memoria en cualquier caso
+      _accessToken = null;
+      _refreshToken = null;
+      currentUser = null;
+    }
   }
 
   Future<Map<String, String>> _getAuthHeaders() async {
@@ -370,6 +403,7 @@ class ApiService {
     String endpoint, {
     Map<String, dynamic>? body,
     Map<String, String>? queryParams,
+    int retryCount = 0,
   }) async {
     final url = Uri.parse('$baseUrl$endpoint').replace(
       queryParameters: queryParams,
@@ -510,8 +544,32 @@ class ApiService {
         }
       }
     } on SocketException catch (e) {
+      // Reintentar en caso de error de conexión
+      if (retryCount < 2) {
+        // Esperar un segundo antes de reintentar
+        await Future.delayed(Duration(seconds: 1));
+        return _authenticatedRequest(
+          method,
+          endpoint,
+          body: body,
+          queryParams: queryParams,
+          retryCount: retryCount + 1,
+        );
+      }
       throw Exception('Error de conexión: ${e.toString()}');
     } catch (e) {
+      // Reintentar para otros errores también
+      if (retryCount < 2) {
+        // Esperar un segundo antes de reintentar
+        await Future.delayed(Duration(seconds: 1));
+        return _authenticatedRequest(
+          method,
+          endpoint,
+          body: body,
+          queryParams: queryParams,
+          retryCount: retryCount + 1,
+        );
+      }
       throw Exception('Error en solicitud: ${e.toString()}');
     }
   }
@@ -522,13 +580,31 @@ class ApiService {
   Future<Map<String, dynamic>> _loadUserProfile() async {
     const cacheKey = 'user_profile';
 
+    // Primero intentamos usar los datos en memoria si existen
+    if (currentUser != null) {
+      return {
+        'id': currentUser!.id,
+        'username': currentUser!.username,
+        'email': currentUser!.email,
+        'points': currentUser!.points,
+        'total_points': currentUser!.points,
+        'races_played': 0,
+        'poles_guessed': 0,
+        'avatar': currentUser!.avatar,
+      };
+    }
+
     try {
+      // Intentar obtener datos del servidor primero
       final response = await _authenticatedRequest(
         'GET',
         profileEndpoint,
       );
 
       if (response != null && response is Map<String, dynamic>) {
+        // Depurar la respuesta
+        debugPrint('Response from profile endpoint: $response');
+
         // Asegurar que los campos necesarios existan
         final Map<String, dynamic> safeProfileData = {
           'id': response['id']?.toString() ?? '',
@@ -541,44 +617,79 @@ class ApiService {
           'avatar': response['avatar'],
         };
 
-        // Actualizar el currentUser con los datos del perfil
-        currentUser = UserModel(
-          id: safeProfileData['id'],
-          username: safeProfileData['username'],
-          email: safeProfileData['email'],
-          password: '',
-          points: safeProfileData['points'],
-          avatar: safeProfileData['avatar'],
-        );
+        debugPrint('Safe profile data: $safeProfileData');
 
-        // Guardar en SharedPreferences para persistencia
-        final prefs = await _storage;
-        await prefs.setString('user_id', safeProfileData['id']);
-        await prefs.setString('username', safeProfileData['username']);
-        await prefs.setString('email', safeProfileData['email']);
-        await prefs.setInt('points', safeProfileData['points']);
-        if (safeProfileData['avatar'] != null) {
-          await prefs.setString('avatar', safeProfileData['avatar']);
+        // Actualizar el currentUser con los datos del perfil
+        try {
+          currentUser = UserModel(
+            id: safeProfileData['id'],
+            username: safeProfileData['username'],
+            email: safeProfileData['email'],
+            password: '',
+            points: safeProfileData['points'],
+            avatar: safeProfileData['avatar'],
+          );
+
+          // Guardar en SharedPreferences para persistencia
+          final prefs = await _storage;
+          await prefs.setString('user_id', safeProfileData['id']);
+          await prefs.setString('username', safeProfileData['username']);
+          await prefs.setString('email', safeProfileData['email']);
+          await prefs.setInt('points', safeProfileData['points']);
+          if (safeProfileData['avatar'] != null) {
+            await prefs.setString('avatar', safeProfileData['avatar']);
+          }
+
+          debugPrint('Updated currentUser: ${currentUser?.username}');
+        } catch (storageError) {
+          debugPrint('Error saving user data: $storageError');
+          // Continuar incluso si hay errores al guardar
         }
 
         // Guardar en caché
         _saveToCache(cacheKey, safeProfileData);
         return safeProfileData;
+      } else {
+        debugPrint('Invalid response from profile endpoint: $response');
+      }
+    } catch (e) {
+      debugPrint('Error loading profile from server: $e');
+      // Si hay error al cargar desde el servidor, continuamos con los datos en caché
+    }
+
+    // Si no hay respuesta válida del servidor, intentar usar datos en caché
+    final cachedData = _getFromCache(cacheKey);
+    if (cachedData != null && cachedData is Map<String, dynamic>) {
+      debugPrint('Using cached profile data');
+
+      // Intentar actualizar currentUser con los datos de caché
+      try {
+        currentUser = UserModel(
+          id: cachedData['id'],
+          username: cachedData['username'],
+          email: cachedData['email'],
+          password: '',
+          points: cachedData['points'],
+          avatar: cachedData['avatar'],
+        );
+      } catch (e) {
+        debugPrint('Error setting currentUser from cache: $e');
       }
 
-      // Si no hay respuesta válida, intentar usar datos en caché
-      final cachedData = _getFromCache(cacheKey);
-      if (cachedData != null && cachedData is Map<String, dynamic>) {
-        return cachedData;
-      }
+      return cachedData;
+    }
 
-      // Si no hay datos en caché, usar datos almacenados en SharedPreferences
+    // Si no hay datos en caché, usar datos almacenados en SharedPreferences
+    try {
       final prefs = await _storage;
       final userId = prefs.getString('user_id');
       final username = prefs.getString('username');
       final email = prefs.getString('email');
       final points = prefs.getInt('points') ?? 0;
       final avatar = prefs.getString('avatar');
+
+      debugPrint(
+          'SharedPreferences data - username: $username, userId: $userId');
 
       if (userId != null && username != null) {
         final userData = {
@@ -602,58 +713,79 @@ class ApiService {
           avatar: avatar,
         );
 
+        // También guardar en caché
+        _saveToCache(cacheKey, userData);
+
+        debugPrint('Using SharedPreferences profile data');
         return userData;
       }
-
-      // Si no hay datos almacenados, usar datos por defecto
-      return {
-        'id': '0',
-        'username': 'Usuario',
-        'email': '',
-        'points': 0,
-        'total_points': 0,
-        'races_played': 0,
-        'poles_guessed': 0,
-        'avatar': null,
-      };
     } catch (e) {
-      // En caso de error, intentar usar datos en caché o almacenados
-      final cachedData = _getFromCache(cacheKey);
-      if (cachedData != null && cachedData is Map<String, dynamic>) {
-        return cachedData;
-      }
-
-      final prefs = await _storage;
-      final userId = prefs.getString('user_id');
-      final username = prefs.getString('username');
-      final email = prefs.getString('email');
-      final points = prefs.getInt('points') ?? 0;
-      final avatar = prefs.getString('avatar');
-
-      if (userId != null && username != null) {
-        return {
-          'id': userId,
-          'username': username,
-          'email': email ?? '',
-          'points': points,
-          'total_points': points,
-          'races_played': 0,
-          'poles_guessed': 0,
-          'avatar': avatar,
-        };
-      }
-
-      return {
-        'id': '0',
-        'username': 'Usuario',
-        'email': '',
-        'points': 0,
-        'total_points': 0,
-        'races_played': 0,
-        'poles_guessed': 0,
-        'avatar': null,
-      };
+      debugPrint('Error loading profile from SharedPreferences: $e');
     }
+
+    // Si no hay datos almacenados, intentar extraer información del token JWT
+    try {
+      final token = await _getAccessToken();
+      if (token != null) {
+        final decodedToken = JwtDecoder.decode(token);
+        final userId = decodedToken['user_id']?.toString();
+        final username = decodedToken['username']?.toString();
+        final email = decodedToken['email']?.toString();
+
+        debugPrint('JWT token data - username: $username, userId: $userId');
+
+        if (userId != null && username != null) {
+          final userData = {
+            'id': userId,
+            'username': username,
+            'email': email ?? '',
+            'points': 0,
+            'total_points': 0,
+            'races_played': 0,
+            'poles_guessed': 0,
+            'avatar': null,
+          };
+
+          // Actualizar currentUser
+          currentUser = UserModel(
+            id: userId,
+            username: username,
+            email: email ?? '',
+            password: '',
+            points: 0,
+            avatar: null,
+          );
+
+          // También guardar en SharedPreferences
+          try {
+            final prefs = await _storage;
+            await prefs.setString('user_id', userId);
+            await prefs.setString('username', username);
+            if (email != null) await prefs.setString('email', email);
+          } catch (e) {
+            debugPrint('Error saving JWT data to SharedPreferences: $e');
+          }
+
+          debugPrint('Using JWT token data for profile');
+          return userData;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error extracting data from JWT: $e');
+    }
+
+    // Si todo lo demás falla, usar datos por defecto
+    debugPrint('Using default profile data');
+    return {
+      'id': '0',
+      'username': 'Usuario',
+      'email': '',
+      'points': 0,
+      'total_points': 0,
+      'races_played': 0,
+      'poles_guessed': 0,
+      'avatar': null,
+    };
   }
 
   // -------------------------------------------------
@@ -714,6 +846,11 @@ class ApiService {
   Future<void> logout() async {
     await _clearTokens();
     clearCache(); // Limpiar caché al cerrar sesión
+
+    // Asegurar que se borren correctamente las variables en memoria
+    _accessToken = null;
+    _refreshToken = null;
+    currentUser = null;
   }
 
   // Método para obtener el usuario actual
@@ -721,9 +858,19 @@ class ApiService {
     if (currentUser == null) {
       // Intentar cargar el perfil de forma asíncrona si no está disponible
       _loadUserProfile().then((profile) {
-        // El perfil ya se actualiza en _loadUserProfile
+        // Actualizar currentUser con datos recién cargados
+        if (currentUser == null && profile != null) {
+          currentUser = UserModel(
+            id: profile['id'],
+            username: profile['username'],
+            email: profile['email'] ?? '',
+            password: '',
+            points: profile['points'],
+            avatar: profile['avatar'],
+          );
+        }
       }).catchError((e) {
-        // Error al cargar perfil
+        debugPrint('Error al cargar perfil en getCurrentUser: $e');
       });
     }
 
@@ -732,14 +879,24 @@ class ApiService {
 
   // Métodos públicos para inicialización
   Future<void> initializeApp() async {
-    await loadStoredTokens();
-    final token = await getStoredAccessToken();
-    if (token != null) {
-      try {
-        await loadUserProfile();
-      } catch (e) {
-        // Error al cargar el perfil
+    try {
+      await loadStoredTokens();
+      final token = await getStoredAccessToken();
+      if (token != null) {
+        try {
+          await loadUserProfile();
+        } catch (e) {
+          // Si hay error al cargar perfil, intentar una vez más
+          try {
+            await Future.delayed(Duration(milliseconds: 500));
+            await loadUserProfile();
+          } catch (e) {
+            // Error persistente al cargar el perfil
+          }
+        }
       }
+    } catch (e) {
+      // Error en la inicialización, pero la app puede continuar
     }
   }
 
@@ -810,13 +967,21 @@ class ApiService {
   }
 
   void _saveToCache(String key, dynamic data) {
-    _cache[key] = data;
-    _cacheTimestamps[key] = DateTime.now();
+    try {
+      _cache[key] = data;
+      _cacheTimestamps[key] = DateTime.now();
+    } catch (e) {
+      // Error al guardar en caché, pero no es crítico
+    }
   }
 
   dynamic _getFromCache(String key) {
-    if (_isCacheValid(key)) {
-      return _cache[key];
+    try {
+      if (_isCacheValid(key)) {
+        return _cache[key];
+      }
+    } catch (e) {
+      // Error al leer de caché
     }
     return null;
   }

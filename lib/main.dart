@@ -1,57 +1,134 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-import 'screens/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/reset_password_screen.dart';
+import 'services/api_service.dart';
+import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/tournaments_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/bet_screen.dart';
+import 'screens/tournaments_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/forgot_password_screen.dart';
-import 'screens/reset_password_screen.dart';
-import 'screens/register_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/create_tournament_screen.dart';
 import 'screens/join_tournament_screen.dart';
-import 'services/api_service.dart';
 
 void main() async {
-  // Configurar para usar rutas con hash en la web (importante para GitHub Pages)
-  setUrlStrategy(HashUrlStrategy());
-
-  // Asegurarse de que Flutter esté inicializado
+  // Asegurar que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar ApiService y cargar datos del usuario
-  final apiService = ApiService();
-  await apiService.initializeApp();
+  // Configurar URL strategy para web
+  setUrlStrategy(PathUrlStrategy());
 
-  // Ejecutar la app
-  runApp(const F1BettingApp());
+  // Variable para controlar si se ha cargado correctamente
+  bool initialized = false;
+  bool hasError = false;
+  String errorMessage = '';
+
+  // Inicializar ApiService con manejo de errores
+  final apiService = ApiService();
+
+  try {
+    // Inicialización de API con timeout
+    await apiService.initializeApp().timeout(
+      Duration(seconds: 10),
+      onTimeout: () {
+        // Si hay timeout, seguir de todas formas
+        debugPrint('Timeout en inicialización de API, continuando...');
+      },
+    );
+    initialized = true;
+  } catch (e) {
+    debugPrint('Error inicializando la app: $e');
+    hasError = true;
+    errorMessage = e.toString();
+    // Continuar de todos modos para mostrar al menos la pantalla de login
+  }
+
+  // Iniciar la app incluso si hay error, pero guardar el estado
+  runApp(MyApp(
+    apiService: apiService,
+    initialized: initialized,
+    initializationError: hasError ? errorMessage : null,
+  ));
 }
 
-class F1BettingApp extends StatelessWidget {
-  const F1BettingApp({Key? key}) : super(key: key);
+class MyApp extends StatefulWidget {
+  final ApiService apiService;
+  final bool initialized;
+  final String? initializationError;
+
+  const MyApp({
+    Key? key,
+    required this.apiService,
+    required this.initialized,
+    this.initializationError,
+  }) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // Controlador para manejo de errores globales
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Mostrar mensaje de error de inicialización si existe
+    if (widget.initializationError != null) {
+      // Esperar a que el framework esté listo para mostrar el mensaje
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showErrorSnackBar(
+            'Error de inicialización: ${widget.initializationError}');
+      });
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    // Solo mostrar si el contexto es válido
+    if (navigatorKey.currentContext != null) {
+      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'F1 Prode',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: const Color.fromARGB(255, 255, 17, 0),
-        scaffoldBackgroundColor: Colors.black,
-        textTheme: const TextTheme(
-          bodySmall: TextStyle(color: Colors.white),
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
+        colorScheme: ColorScheme.dark(
+          primary: const Color.fromARGB(255, 255, 17, 0),
+          secondary: const Color.fromARGB(255, 255, 17, 0),
         ),
+        scaffoldBackgroundColor: Colors.black,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.black,
+          elevation: 0,
+          centerTitle: true,
           titleTextStyle: TextStyle(
-            color: Color.fromARGB(255, 255, 255, 255),
-            fontSize: 24,
             fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
+        ),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Colors.white),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -59,10 +136,23 @@ class F1BettingApp extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/login',
+      // En la primera carga, mostrar SplashScreen para dar tiempo a la inicialización
+      home: SplashScreen(
+        apiService: widget.apiService,
+        onInitialized: (bool success) {
+          // Si la inicialización falla, mostrar error
+          if (!success && mounted) {
+            _showErrorSnackBar(
+                'Error de inicialización. Algunas funciones pueden no estar disponibles.');
+          }
+        },
+      ),
       routes: {
-        '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
+        '/tournaments': (context) => const TournamentsScreen(),
         '/bet': (context) => BetScreen(
               raceName: '',
               date: '',
@@ -72,71 +162,31 @@ class F1BettingApp extends StatelessWidget {
               hasSprint: false,
             ),
         '/results': (context) => const ResultsScreen(),
-        '/tournaments': (context) => const TournamentsScreen(),
-        '/profile': (context) => const ProfileScreen(),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
+        '/create-tournament': (context) => const CreateTournamentScreen(),
+        '/join-tournament': (context) => const JoinTournamentScreen(),
       },
       onGenerateRoute: (settings) {
-        // Normalizar la ruta para manejar diferentes formatos
-        String routeName = settings.name ?? '';
-
-        // Si viene con # al inicio, quitarlo (puede pasar cuando la ruta inicial viene del index.html)
-        if (routeName.startsWith('#')) {
-          routeName = routeName.substring(1);
-        }
-
-        // Verificar si es una ruta de restablecimiento de contraseña
-        final resetPasswordPattern =
-            RegExp(r'^/?reset-password/([^/]+)/([^/]+)$');
-        final match = resetPasswordPattern.firstMatch(routeName);
-
-        if (match != null) {
-          final uid = match.group(1);
-          final token = match.group(2);
-
-          if (uid != null && token != null) {
-            return MaterialPageRoute(
-              builder: (context) => ResetPasswordScreen(
-                uid: uid,
-                token: token,
-              ),
-            );
-          }
-        }
-
-        // Si la ruta comienza con /reset-password/ (formato alternativo)
-        if (routeName.contains('/reset-password/')) {
-          final parts = routeName.split('/reset-password/');
-          if (parts.length >= 2) {
-            final params = parts[1].split('/');
-            if (params.length >= 2) {
-              final uid = params[0];
-              final token = params[1];
-
+        // Manejar rutas que requieren parámetros
+        if (settings.name != null) {
+          if (settings.name!.contains('reset-password')) {
+            final uri = Uri.parse(settings.name!);
+            String? uid = uri.queryParameters['uid'];
+            String? token = uri.queryParameters['token'];
+            if (uid != null && token != null) {
               return MaterialPageRoute(
-                builder: (context) => ResetPasswordScreen(
-                  uid: uid,
-                  token: token,
-                ),
+                builder: (context) =>
+                    ResetPasswordScreen(uid: uid, token: token),
               );
             }
+          } else if (settings.name == '/edit-profile') {
+            // Para edit-profile, redirigir a profile primero para obtener los datos
+            return MaterialPageRoute(
+              builder: (context) => const ProfileScreen(),
+            );
           }
         }
-
-        // Si la ruta no coincide con ningún patrón, redirigir al login
-        return MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-        );
-      },
-      // Este widget se mostrará durante la carga (importante para web)
-      builder: (context, child) {
-        return child ??
-            const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                    Color.fromARGB(255, 255, 17, 0)),
-              ),
-            );
+        return null;
       },
     );
   }

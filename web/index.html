@@ -31,8 +31,255 @@
 
   <title>f1prodeflutter</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- Estilos para asegurar que Flutter tenga un contenedor válido -->
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+      color: white;
+    }
+    
+    html {
+      width: 100%;
+      height: 100%;
+    }
+    
+    #flutter_app {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .loading-indicator {
+      font-family: 'Arial', sans-serif;
+      text-align: center;
+      font-size: 16px;
+    }
+    
+    .loading-spinner {
+      border: 4px solid rgba(255, 0, 0, 0.3);
+      border-radius: 50%;
+      border-top: 4px solid #ff0000;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    #flutter-debug-info {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+      max-width: 80%;
+      z-index: 9999;
+    }
+  </style>
+
+  <script>
+    // The value below is injected by flutter build, do not touch.
+    var serviceWorkerVersion = null;
+  </script>
+  
+  <!-- Carga el script de flutter.js con verificación de carga -->
+  <script>
+    // Crear un elemento para mostrar información de depuración
+    function mostrarDebug(mensaje) {
+      var debugInfo = document.getElementById('flutter-debug-info');
+      if (!debugInfo) {
+        debugInfo = document.createElement('div');
+        debugInfo.id = 'flutter-debug-info';
+        document.body.appendChild(debugInfo);
+      }
+      
+      var p = document.createElement('p');
+      p.textContent = mensaje;
+      debugInfo.appendChild(p);
+      
+      // Limitar a 5 mensajes
+      while (debugInfo.children.length > 5) {
+        debugInfo.removeChild(debugInfo.firstChild);
+      }
+      
+      console.log(mensaje);
+    }
+    
+    // Primero verificamos que el script de flutter.js esté cargado correctamente
+    document.addEventListener("DOMContentLoaded", function() {
+      console.log('DOM cargado, verificando flutter.js...');
+      
+      // Mostrar un indicador de carga
+      var loadingIndicator = document.createElement('div');
+      loadingIndicator.className = 'loading-indicator';
+      loadingIndicator.innerHTML = '<div class="loading-spinner"></div><p>Cargando F1 Prode...</p>';
+      document.getElementById('flutter_app').appendChild(loadingIndicator);
+      
+      // Cargamos el script dinámicamente
+      var scriptTag = document.createElement('script');
+      scriptTag.src = "flutter.js";
+      scriptTag.type = "application/javascript";
+      
+      // Cuando el script cargue correctamente
+      scriptTag.onload = function() {
+        console.log('flutter.js cargado correctamente');
+        // Iniciar la aplicación
+        iniciarFlutter();
+      };
+      
+      // Si hay un error al cargar el script
+      scriptTag.onerror = function() {
+        console.log('Error al cargar flutter.js. Intentando con ruta absoluta...');
+        
+        // Intento con ruta absoluta
+        var basePath = window.location.origin + window.location.pathname;
+        if (!basePath.endsWith('/')) {
+          basePath += '/';
+        }
+        
+        scriptTag.src = basePath + "flutter.js";
+        console.log('Intentando cargar desde: ' + scriptTag.src);
+        
+        document.head.appendChild(scriptTag);
+      };
+      
+      document.head.appendChild(scriptTag);
+    });
+    
+    // Función para detectar rutas de reset de contraseña
+    function detectResetPasswordRoute() {
+      console.log('URL actual: ' + window.location.href);
+      console.log('Hash: ' + window.location.hash);
+      console.log('Path: ' + window.location.pathname);
+      
+      // Detectar primero en el hash
+      if (window.location.hash && window.location.hash.includes('reset-password')) {
+        console.log('Detectada ruta de reset password en hash: ' + window.location.hash);
+        return window.location.hash;
+      }
+      
+      // Intentar detectar en el pathname
+      if (window.location.pathname.includes('reset-password')) {
+        console.log('Detectada ruta de reset password en pathname: ' + window.location.pathname);
+        return '#' + window.location.pathname;
+      }
+      
+      return null;
+    }
+
+    // Función para iniciar Flutter
+    function iniciarFlutter() {
+      if (typeof _flutter === 'undefined') {
+        console.log('_flutter no está definido. Comprobando alternativas...');
+        
+        if (typeof window.flutter !== 'undefined') {
+          console.log('Usando la API moderna de Flutter...');
+          // Método moderno
+          iniciarFlutterModerno();
+          return;
+        }
+        
+        console.log('ERROR: No se encuentra ninguna API de Flutter');
+        document.getElementById('flutter_app').innerHTML = '<div style="color: red; padding: 20px; background: #500; margin: 20px; border-radius: 5px; font-family: sans-serif; text-align: center;"><h2>Error al cargar Flutter</h2><p>No se pudo cargar la aplicación. Por favor, intenta recargar la página.</p><button onclick="location.reload()" style="padding: 10px 20px; background: #f00; color: white; border: none; border-radius: 5px; cursor: pointer;">Recargar</button></div>';
+        return;
+      }
+      
+      console.log('Iniciando carga de Flutter con método clásico...');
+      
+      // Detectar ruta inicial
+      var initialRoute = detectResetPasswordRoute();
+      console.log('Ruta inicial detectada: ' + (initialRoute || 'null'));
+      
+      try {
+        // Initialize Flutter using the old method
+        _flutter.loader.loadEntrypoint({
+          serviceWorker: {
+            serviceWorkerVersion: serviceWorkerVersion,
+          },
+          onEntrypointLoaded: async function(engineInitializer) {
+            console.log('Entrypoint cargado, iniciando engine...');
+            
+            try {
+              var appRunner = await engineInitializer.initializeEngine({
+                hostElement: document.querySelector('#flutter_app'),
+                initialRoute: initialRoute
+              });
+              
+              console.log('Engine inicializado, ejecutando app...');
+              
+              // Limpiar indicador de carga antes de ejecutar la app
+              document.getElementById('flutter_app').innerHTML = '';
+              
+              await appRunner.runApp();
+              
+              console.log('Aplicación Flutter iniciada correctamente');
+            } catch (e) {
+              console.log('ERROR al inicializar el engine: ' + e.message);
+              document.getElementById('flutter_app').innerHTML = '<div style="color: red; padding: 20px; background: #500; margin: 20px; border-radius: 5px; font-family: sans-serif; text-align: center;"><h2>Error al inicializar Flutter</h2><p>' + e.message + '</p><button onclick="location.reload()" style="padding: 10px 20px; background: #f00; color: white; border: none; border-radius: 5px; cursor: pointer;">Recargar</button></div>';
+            }
+          }
+        });
+      } catch (e) {
+        console.log('ERROR en loadEntrypoint: ' + e.message);
+        document.getElementById('flutter_app').innerHTML = '<div style="color: red; padding: 20px; background: #500; margin: 20px; border-radius: 5px; font-family: sans-serif; text-align: center;"><h2>Error al cargar Flutter</h2><p>' + e.message + '</p><button onclick="location.reload()" style="padding: 10px 20px; background: #f00; color: white; border: none; border-radius: 5px; cursor: pointer;">Recargar</button></div>';
+      }
+    }
+    
+    // Método moderno para iniciar Flutter (como fallback)
+    async function iniciarFlutterModerno() {
+      try {
+        console.log('Intentando cargar Flutter con método moderno...');
+        await flutter.load();
+        
+        // Detectar ruta inicial
+        const initialRoute = detectResetPasswordRoute();
+        console.log('Ruta inicial detectada (moderno): ' + (initialRoute || 'null'));
+
+        // Limpiar indicador de carga antes de inicializar el engine
+        document.getElementById('flutter_app').innerHTML = '';
+        
+        // Configurar y ejecutar la aplicación
+        const engineInitializer = await flutter.initializeEngine({
+          hostElement: document.querySelector('#flutter_app'),
+          initialRoute: initialRoute
+        });
+
+        await engineInitializer.autoStart();
+        console.log('Aplicación Flutter iniciada correctamente (moderno)');
+      } catch (e) {
+        console.log('ERROR al inicializar Flutter (método moderno): ' + e.message);
+        document.getElementById('flutter_app').innerHTML = '<div style="color: red; padding: 20px; background: #500; margin: 20px; border-radius: 5px; font-family: sans-serif; text-align: center;"><h2>Error al inicializar Flutter</h2><p>' + e.message + '</p><button onclick="location.reload()" style="padding: 10px 20px; background: #f00; color: white; border: none; border-radius: 5px; cursor: pointer;">Recargar</button></div>';
+      }
+    }
+    
+    // Agregar listener para cambios en la URL después de iniciar la app
+    window.addEventListener('hashchange', function() {
+      console.log('Hash cambiado a: ' + window.location.hash);
+    });
+  </script>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <div id="flutter_app"></div>
 </body>
 </html>

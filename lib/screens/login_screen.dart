@@ -166,7 +166,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             // Olvidaste contraseña
                             TextButton(
                               onPressed: () {
-                                // Navigate to forgot password screen
+                                Navigator.pushNamed(
+                                    context, '/forgot-password');
                               },
                               child: const Text(
                                 '¿Olvidaste tu contraseña?',

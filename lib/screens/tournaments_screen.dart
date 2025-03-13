@@ -64,18 +64,24 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     }
 
     try {
-      final newTournament =
+      final response =
           await apiService.createTournament(_tournamentNameController.text);
-      setState(() {
-        tournaments.add(newTournament);
-      });
-      _tournamentNameController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Torneo creado exitosamente'),
-          backgroundColor: Colors.green,
-        ),
-      );
+
+      if (response['success'] == true && response['tournament'] != null) {
+        final tournamentData = response['tournament'];
+        final newTournament = Tournament.fromJson(tournamentData);
+
+        setState(() {
+          tournaments.add(newTournament);
+        });
+        _tournamentNameController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Torneo creado exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -98,15 +104,24 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     }
 
     try {
-      final joined =
+      final response =
           await apiService.joinTournament(_inviteCodeController.text);
-      if (joined) {
+
+      if (response['success'] == true) {
         _fetchTournaments();
         _inviteCodeController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Te has unido al torneo exitosamente'),
             backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Error: ${response['error'] ?? 'No se pudo unir al torneo'}'),
+            backgroundColor: Colors.red,
           ),
         );
       }

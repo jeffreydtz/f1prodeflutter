@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F1 Prode - Página no encontrada</title>
+  <script type="text/javascript">
+    // Redirigir cualquier ruta a la app principal con el hash
+    window.onload = function() {
+      // Detectar si la ruta contiene reset-password
+      var path = window.location.pathname;
+      var isResetPath = path.includes('reset-password');
+      
+      console.log('404 - Ruta detectada:', path);
+      console.log('¿Es ruta de reset?', isResetPath);
+      
+      // Construir la URL de redirección
+      var basePath = '/f1prode-flutter-webapp/';
+      var redirectUrl = basePath;
+      
+      if (isResetPath) {
+        // Si es una ruta de reset, agregarla como hash
+        // Formato esperado: /reset-password/uid/token
+        redirectUrl = basePath + '#' + path;
+        console.log('Redirigiendo a:', redirectUrl);
+      }
+      
+      // Redirigir
+      window.location.href = redirectUrl;
+    };
+  </script>
+</head>
+<body>
+  <h2>Redirigiendo...</h2>
+  <p>Estás siendo redirigido a la aplicación principal.</p>
+</body>
+</html> 

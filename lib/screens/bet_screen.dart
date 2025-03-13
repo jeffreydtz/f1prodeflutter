@@ -263,30 +263,35 @@ class _BetScreenState extends State<BetScreen> {
     }
 
     try {
-      final success = await apiService.createBet(
-        season: widget.season,
-        round: widget.round,
-        raceName: widget.raceName,
-        date: widget.date,
-        circuit: widget.circuit,
-        hasSprint: widget.hasSprint,
-        poleman: _selectedPoleman,
-        top10: _top10,
-        dnf: _selectedDnf,
-        fastestLap: _selectedFastestLap,
-        sprintTop10: widget.hasSprint ? _sprintTop8 : null,
-      );
+      final result = await apiService.createBet({
+        'season': widget.season,
+        'round': widget.round,
+        'race_name': widget.raceName,
+        'date': widget.date,
+        'circuit': widget.circuit,
+        'has_sprint': widget.hasSprint,
+        'poleman': _selectedPoleman,
+        'top10': _top10,
+        'dnf': _selectedDnf,
+        'fastest_lap': _selectedFastestLap,
+        if (widget.hasSprint) 'sprint_top10': _sprintTop8,
+      });
 
-      if (success && mounted) {
+      if (result['success'] == true && mounted) {
         await _showDialog('Predicción confirmada con éxito.', Colors.green,
             Icons.check_circle);
         if (mounted) {
           Navigator.of(context).pop();
         }
+      } else if (mounted) {
+        final errorMessage =
+            result['error'] ?? 'Error desconocido al enviar la predicción';
+        await _showDialog(
+            errorMessage, const Color.fromARGB(255, 255, 17, 0), Icons.error);
       }
     } catch (e) {
       if (mounted) {
-        _showDialog('Error al enviar la predicción: ${e.toString()}',
+        await _showDialog('Error al enviar la predicción: ${e.toString()}',
             const Color.fromARGB(255, 255, 17, 0), Icons.error);
       }
     }

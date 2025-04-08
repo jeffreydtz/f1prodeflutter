@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import '../utils/image_picker_interface.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -86,21 +88,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _selectImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 400,
-      maxHeight: 400,
-      imageQuality: 75,
-    );
+    try {
+      final result = await ImagePickerInterface.pickImage();
 
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      final base64 = base64Encode(bytes);
-      setState(() {
-        _selectedImage = bytes;
-        _avatarBase64 =
-            'data:image/${image.name.split('.').last};base64,$base64';
-      });
+      if (result != null) {
+        setState(() {
+          _selectedImage = result['bytes'];
+          _avatarBase64 = result['base64'];
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Error al seleccionar la imagen. Por favor, intenta de nuevo.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -118,8 +122,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      print('Verificando disponibilidad de username: $username');
-
       // Obtener el ID del usuario actual
       final userId = widget.userData['id']?.toString();
 
@@ -137,7 +139,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error al verificar disponibilidad de username: $e');
       if (mounted) {
         setState(() {
           _usernameAvailable = true; // Asumimos disponible en caso de error
@@ -161,8 +162,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      print('Verificando disponibilidad de email: $email');
-
       // Obtener el ID del usuario actual
       final userId = widget.userData['id']?.toString();
 
@@ -180,7 +179,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error al verificar disponibilidad de email: $e');
       if (mounted) {
         setState(() {
           _emailAvailable = true; // Asumimos disponible en caso de error
@@ -233,7 +231,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     } catch (e) {
-      print('Error al actualizar perfil: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

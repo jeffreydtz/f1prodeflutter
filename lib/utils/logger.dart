@@ -5,34 +5,26 @@ class Logger {
   static bool _enableLogs = true;
 
   static void log(String message) {
-    if (_enableLogs) {
-      if (kDebugMode) {
-        print(message);
-      }
+    if (kDebugMode) {
+      debugPrint(message);
     }
   }
 
   static void error(String message) {
-    if (_enableLogs) {
-      if (kDebugMode) {
-        print('ERROR: $message');
-      }
+    if (kDebugMode) {
+      debugPrint('ERROR: $message');
     }
   }
 
   static void info(String message) {
-    if (_enableLogs) {
-      if (kDebugMode) {
-        print('INFO: $message');
-      }
+    if (kDebugMode) {
+      debugPrint('INFO: $message');
     }
   }
 
   static void warning(String message) {
-    if (_enableLogs) {
-      if (kDebugMode) {
-        print('WARNING: $message');
-      }
+    if (kDebugMode) {
+      debugPrint('WARNING: $message');
     }
   }
 

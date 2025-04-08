@@ -658,9 +658,6 @@ class ApiService {
       );
 
       if (response != null && response is Map<String, dynamic>) {
-        // Depurar la respuesta
-        debugPrint('Response from profile endpoint: $response');
-
         // Asegurar que los campos necesarios existan
         final Map<String, dynamic> safeProfileData = {
           'id': response['id']?.toString() ?? '',
@@ -672,8 +669,6 @@ class ApiService {
           'poles_guessed': response['poles_guessed'] ?? 0,
           'avatar': response['avatar'],
         };
-
-        debugPrint('Safe profile data: $safeProfileData');
 
         // Actualizar el currentUser con los datos del perfil
         try {
@@ -695,29 +690,21 @@ class ApiService {
           if (safeProfileData['avatar'] != null) {
             await prefs.setString('avatar', safeProfileData['avatar']);
           }
-
-          debugPrint('Updated currentUser: ${currentUser?.username}');
         } catch (storageError) {
-          debugPrint('Error saving user data: $storageError');
           // Continuar incluso si hay errores al guardar
         }
 
         // Guardar en caché
         _saveToCache(cacheKey, safeProfileData);
         return safeProfileData;
-      } else {
-        debugPrint('Invalid response from profile endpoint: $response');
       }
     } catch (e) {
-      debugPrint('Error loading profile from server: $e');
       // Si hay error al cargar desde el servidor, continuamos con los datos en caché
     }
 
     // Si no hay respuesta válida del servidor, intentar usar datos en caché
     final cachedData = _getFromCache(cacheKey);
     if (cachedData != null && cachedData is Map<String, dynamic>) {
-      debugPrint('Using cached profile data');
-
       // Intentar actualizar currentUser con los datos de caché
       try {
         currentUser = UserModel(
@@ -729,7 +716,7 @@ class ApiService {
           avatar: cachedData['avatar'],
         );
       } catch (e) {
-        debugPrint('Error setting currentUser from cache: $e');
+        // Ignorar errores al actualizar currentUser desde caché
       }
 
       return cachedData;
@@ -743,9 +730,6 @@ class ApiService {
       final email = prefs.getString('email');
       final points = prefs.getInt('points') ?? 0;
       final avatar = prefs.getString('avatar');
-
-      debugPrint(
-          'SharedPreferences data - username: $username, userId: $userId');
 
       if (userId != null && username != null) {
         final userData = {
@@ -772,66 +756,13 @@ class ApiService {
         // También guardar en caché
         _saveToCache(cacheKey, userData);
 
-        debugPrint('Using SharedPreferences profile data');
         return userData;
       }
     } catch (e) {
-      debugPrint('Error loading profile from SharedPreferences: $e');
-    }
-
-    // Si no hay datos almacenados, intentar extraer información del token JWT
-    try {
-      final token = await _getAccessToken();
-      if (token != null) {
-        final decodedToken = JwtDecoder.decode(token);
-        final userId = decodedToken['user_id']?.toString();
-        final username = decodedToken['username']?.toString();
-        final email = decodedToken['email']?.toString();
-
-        debugPrint('JWT token data - username: $username, userId: $userId');
-
-        if (userId != null && username != null) {
-          final userData = {
-            'id': userId,
-            'username': username,
-            'email': email ?? '',
-            'points': 0,
-            'total_points': 0,
-            'races_played': 0,
-            'poles_guessed': 0,
-            'avatar': null,
-          };
-
-          // Actualizar currentUser
-          currentUser = UserModel(
-            id: userId,
-            username: username,
-            email: email ?? '',
-            password: '',
-            points: 0,
-            avatar: null,
-          );
-
-          // También guardar en SharedPreferences
-          try {
-            final prefs = await _storage;
-            await prefs.setString('user_id', userId);
-            await prefs.setString('username', username);
-            if (email != null) await prefs.setString('email', email);
-          } catch (e) {
-            debugPrint('Error saving JWT data to SharedPreferences: $e');
-          }
-
-          debugPrint('Using JWT token data for profile');
-          return userData;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error extracting data from JWT: $e');
+      // Ignorar errores al cargar desde SharedPreferences
     }
 
     // Si todo lo demás falla, usar datos por defecto
-    debugPrint('Using default profile data');
     return {
       'id': '0',
       'username': 'Usuario',
@@ -857,15 +788,11 @@ class ApiService {
       );
 
       if (response != null) {
-        debugPrint('Raw profile response: $response');
-
         // Extraer los datos del perfil de la estructura anidada
         final Map<String, dynamic> profileData =
             response is Map<String, dynamic>
                 ? (response['profile'] as Map<String, dynamic>? ?? response)
                 : {'error': 'Invalid response format'};
-
-        debugPrint('Extracted profile data: $profileData');
 
         // Crear el modelo de usuario con los datos del perfil
         final user = UserModel(
@@ -879,8 +806,6 @@ class ApiService {
           lastName: profileData['last_name'],
           favoriteTeam: profileData['favorite_team'],
         );
-
-        debugPrint('Created user model: ${user.toJson()}');
 
         // Actualizar el usuario actual en memoria
         currentUser = user;
@@ -903,7 +828,6 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error getting user profile: $e');
       return null;
     }
   }
@@ -956,7 +880,6 @@ class ApiService {
       );
       return response != null;
     } catch (e) {
-      print('Error updating user profile: $e');
       return false;
     }
   }

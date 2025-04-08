@@ -52,9 +52,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profileData = await apiService.getUserProfile();
 
       if (profileData != null) {
-        // Debug para ver qué datos recibimos
-        debugPrint('Profile data loaded: ${profileData.toJson()}');
-
         if (mounted) {
           setState(() {
             user = profileData;
@@ -103,7 +100,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
     } catch (e) {
-      debugPrint('Error cargando perfil: $e');
       if (mounted) {
         setState(() {
           _loading = false;

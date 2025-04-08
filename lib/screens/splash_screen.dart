@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   final ApiService apiService;
@@ -20,39 +21,38 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _initialize();
+    _checkAuthAndRedirect();
   }
 
-  Future<void> _initialize() async {
+  Future<void> _checkAuthAndRedirect() async {
     try {
-      await widget.apiService.initializeApp();
+      // Intentar obtener el token almacenado
+      final token = await widget.apiService.getStoredAccessToken();
+
       if (mounted) {
         widget.onInitialized(true);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+
+        if (token != null) {
+          // Si hay token, inicializar la app en segundo plano y redirigir al home
+          widget.apiService.initializeApp(); // No esperamos a que termine
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else {
+          // Si no hay token, redirigir al login
+          Navigator.of(context).pushReplacementNamed('/login');
+        }
       }
     } catch (e) {
       if (mounted) {
         widget.onInitialized(false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        // En caso de error, redirigir al login
+        Navigator.of(context).pushReplacementNamed('/login');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(
-            Theme.of(context).colorScheme.primary,
-          ),
-        ),
-      ),
-    );
+    // Este widget nunca debería mostrarse, pero por si acaso
+    return const SizedBox.shrink();
   }
 }

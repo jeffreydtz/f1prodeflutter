@@ -30,37 +30,14 @@ void main() async {
     setUrlStrategy(PathUrlStrategy());
   }
 
-  // Variable para controlar si se ha cargado correctamente
-  bool initialized = false;
-  bool hasError = false;
-  String errorMessage = '';
-
-  // Inicializar ApiService con manejo de errores
+  // Inicializar ApiService
   final apiService = ApiService();
 
-  try {
-    // Inicialización de API con timeout
-    await apiService.initializeApp().timeout(
-      Duration(seconds: 10),
-      onTimeout: () {
-        // Si hay timeout, seguir de todas formas
-        debugPrint('Timeout en inicialización de API, continuando...');
-        return true; // Return true to indicate initialization completed
-      },
-    );
-    initialized = true;
-  } catch (e) {
-    debugPrint('Error inicializando la app: $e');
-    hasError = true;
-    errorMessage = e.toString();
-    // Continuar de todos modos para mostrar al menos la pantalla de login
-  }
-
-  // Iniciar la app incluso si hay error, pero guardar el estado
+  // Ejecutar la app inmediatamente
   runApp(MyApp(
     apiService: apiService,
-    initialized: initialized,
-    initializationError: hasError ? errorMessage : null,
+    initialized: true,
+    initializationError: null,
   ));
 }
 
@@ -81,13 +58,11 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Controlador para manejo de errores globales
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-
     // Mostrar mensaje de error de inicialización si existe
     if (widget.initializationError != null) {
       // Esperar a que el framework esté listo para mostrar el mensaje
@@ -99,7 +74,6 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _showErrorSnackBar(String message) {
-    // Solo mostrar si el contexto es válido
     if (navigatorKey.currentContext != null) {
       ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
         SnackBar(
@@ -142,11 +116,9 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
       ),
-      // En la primera carga, mostrar SplashScreen para dar tiempo a la inicialización
       home: SplashScreen(
         apiService: widget.apiService,
         onInitialized: (bool success) {
-          // Si la inicialización falla, mostrar error
           if (!success && mounted) {
             _showErrorSnackBar(
                 'Error de inicialización. Algunas funciones pueden no estar disponibles.');
@@ -173,7 +145,6 @@ class _MyAppState extends State<MyApp> {
         '/join-tournament': (context) => const JoinTournamentScreen(),
       },
       onGenerateRoute: (settings) {
-        // Manejar rutas que requieren parámetros
         if (settings.name != null) {
           if (settings.name!.contains('reset-password')) {
             final uri = Uri.parse(settings.name!);
@@ -186,7 +157,6 @@ class _MyAppState extends State<MyApp> {
               );
             }
           } else if (settings.name == '/edit-profile') {
-            // Para edit-profile, redirigir a profile primero para obtener los datos
             return MaterialPageRoute(
               builder: (context) => const ProfileScreen(),
             );

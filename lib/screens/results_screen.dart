@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/betresult.dart';
+import '../widgets/responsive_layout.dart';
+import '../widgets/web_navbar.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String? initialRaceId;
@@ -11,17 +13,29 @@ class ResultsScreen extends StatefulWidget {
   State<ResultsScreen> createState() => _ResultsScreenState();
 }
 
-class _ResultsScreenState extends State<ResultsScreen> {
+class _ResultsScreenState extends State<ResultsScreen>
+    with SingleTickerProviderStateMixin {
   final ApiService apiService = ApiService();
   List<BetResult> _results = [];
   bool _isLoading = true;
   String? _expandedRaceId;
+  late TabController _tabController;
+  bool _hasError = false;
+  String? _errorMessage;
+  int _selectedIndex = 1;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _fetchResults();
     _expandedRaceId = widget.initialRaceId;
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchResults() async {
@@ -32,53 +46,235 @@ class _ResultsScreenState extends State<ResultsScreen> {
         setState(() {
           _results = results;
           _isLoading = false;
+          _hasError = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar resultados: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = e.toString();
+        });
       }
-      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isWeb = ResponsiveLayout.isWeb(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Predicciones'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchResults,
-          ),
-        ],
-      ),
+      appBar: isWeb
+          ? WebNavbar(
+              title: 'Resultados',
+              currentIndex: _selectedIndex,
+              onRefresh: _fetchResults,
+              showBackButton: Navigator.canPop(context),
+              onBackPressed: () => Navigator.of(context).pop(),
+            )
+          : AppBar(
+              title: const Text('Resultados'),
+              leading: Navigator.canPop(context)
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  : null,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _fetchResults,
+                ),
+              ],
+              bottom: TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'En curso'),
+                  Tab(text: 'Completadas'),
+                ],
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: const Color.fromARGB(255, 255, 17, 0),
+              ),
+            ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
                 color: Color.fromARGB(255, 255, 17, 0),
               ),
             )
-          : _results.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No hay resultados disponibles',
-                    style: TextStyle(color: Colors.white),
+          : _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 60,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage ?? 'Error desconocido',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _fetchResults,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              const Color.fromARGB(255, 255, 17, 0),
+                        ),
+                        child: const Text(
+                          'Reintentar',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
                   ),
                 )
-              : ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) {
-                    final betRes = _results[index];
-                    return _buildBetResultCard(betRes);
-                  },
+              : _results.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No hay predicciones disponibles',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // Si es web, mostrar tabs manualmente ya que no están en AppBar
+                        if (isWeb)
+                          TabBar(
+                            controller: _tabController,
+                            tabs: const [
+                              Tab(text: 'En curso'),
+                              Tab(text: 'Completadas'),
+                            ],
+                            labelColor: Colors.white,
+                            unselectedLabelColor: Colors.white70,
+                            indicatorColor:
+                                const Color.fromARGB(255, 255, 17, 0),
+                          ),
+                        Expanded(
+                          child: TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _buildPredictionsList(
+                                  false), // Predicciones en curso
+                              _buildPredictionsList(
+                                  true), // Predicciones completadas
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+      bottomNavigationBar: !isWeb
+          ? BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+                switch (index) {
+                  case 0:
+                    Navigator.pushReplacementNamed(context, '/home');
+                    break;
+                  case 1:
+                    Navigator.pushReplacementNamed(context, '/results');
+                    break;
+                  case 2:
+                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    break;
+                  case 3:
+                    Navigator.pushReplacementNamed(context, '/profile');
+                    break;
+                }
+              },
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: const Color.fromARGB(255, 30, 30, 30),
+              selectedItemColor: const Color.fromARGB(255, 255, 17, 0),
+              unselectedItemColor: Colors.white70,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Inicio',
                 ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.list_alt),
+                  label: 'Resultados',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people),
+                  label: 'Torneos',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Perfil',
+                ),
+              ],
+            )
+          : null,
+    );
+  }
+
+  Widget _buildPredictionsList(bool showCompleted) {
+    final currentUser = apiService.getCurrentUser();
+    if (currentUser == null) {
+      return const Center(
+        child: Text(
+          'No has iniciado sesión',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    // Filtrar los resultados según si están completados o no
+    final filteredResults =
+        _results.where((bet) => bet.isComplete == showCompleted).toList();
+
+    if (filteredResults.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              showCompleted
+                  ? Icons.emoji_events_outlined
+                  : Icons.pending_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              showCompleted
+                  ? 'No hay predicciones completadas'
+                  : 'No hay predicciones en curso',
+              style: const TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _fetchResults,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 255, 17, 0),
+              ),
+              child: const Text(
+                'Actualizar',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: filteredResults.length,
+      itemBuilder: (context, index) {
+        final betRes = filteredResults[index];
+        return _buildBetResultCard(betRes);
+      },
     );
   }
 
@@ -170,16 +366,16 @@ class _ResultsScreenState extends State<ResultsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Center(
+        const Center(
           child: Column(
             children: [
-              const Icon(
+              Icon(
                 Icons.timer_outlined,
                 color: Colors.amber,
                 size: 48,
               ),
-              const SizedBox(height: 16),
-              const Text(
+              SizedBox(height: 16),
+              Text(
                 'Carrera pendiente',
                 style: TextStyle(
                   color: Colors.amber,
@@ -187,8 +383,8 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
+              SizedBox(height: 8),
+              Text(
                 'Los resultados estarán disponibles cuando finalice la carrera',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -264,7 +460,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
 
         // DNF
         _buildSectionTitle('DNF'),
-        _buildComparisonRow(
+        _buildDnfComparison(
           prediction: bet.dnfUser,
           result: bet.dnfReal,
         ),
@@ -355,28 +551,105 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 
+  Widget _buildDnfComparison({
+    required String prediction,
+    required String? result,
+  }) {
+    // Verificar si el piloto predicho está en la lista de DNFs reales
+    bool isCorrect = false;
+    if (result != null) {
+      // Si el resultado es una lista (separada por comas), dividirla
+      if (result.contains(',')) {
+        final List<String> dnfList =
+            result.split(',').map((e) => e.trim()).toList();
+        isCorrect = dnfList.contains(prediction);
+      } else {
+        // Si es un solo piloto, comparar directamente
+        isCorrect = prediction == result;
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Tu predicción:',
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                Text(
+                  prediction,
+                  style: TextStyle(
+                    color: result != null
+                        ? (isCorrect ? Colors.green : Colors.red)
+                        : Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (result != null) ...[
+            const SizedBox(width: 24),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Resultado:',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  Text(
+                    result,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
       style: const TextStyle(
         color: Colors.white,
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: FontWeight.bold,
       ),
     );
   }
 
-  Widget _buildTop10List(List<String> top10) {
+  Widget _buildTop10List(List<String> drivers) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: top10.asMap().entries.map((entry) {
-        final index = entry.key;
-        final pilot = entry.value;
-        return Text(
-          '${index + 1}. $pilot',
-          style: const TextStyle(color: Colors.white, fontSize: 16),
-        );
-      }).toList(),
+      children: List.generate(
+        drivers.length,
+        (index) => ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.grey[800],
+            child: Text(
+              '${index + 1}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+          title: Text(
+            drivers[index],
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      ),
     );
   }
 

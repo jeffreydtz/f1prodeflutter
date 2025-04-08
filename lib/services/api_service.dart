@@ -41,6 +41,7 @@ class ApiService {
   static const String racesEndpoint = '/f1/races/';
   static const String driversEndpoint = '/f1/drivers/';
   static const String betsEndpoint = '/bets/';
+  static const String allBetResultsEndpoint = '/bets/all-results/';
   static const String tournamentsEndpoint = '/tournaments/';
   static const String passwordResetEndpoint = '/users/password-reset/';
   static const String passwordResetConfirmEndpoint =
@@ -393,6 +394,61 @@ class ApiService {
       if (token != null) 'Authorization': 'Bearer $token',
     };
     return headers;
+  }
+
+  // Initializes the app by checking auth state and clearing invalid sessions
+  Future<bool> initializeApp() async {
+    try {
+      // First, clear cache to prevent stale data
+      _clearCache();
+
+      // Try to load tokens
+      await _loadTokens();
+
+      // Verify token validity
+      if (_accessToken != null) {
+        try {
+          final decodedToken = JwtDecoder.decode(_accessToken!);
+          final expiration =
+              DateTime.fromMillisecondsSinceEpoch(decodedToken['exp'] * 1000);
+          final now = DateTime.now();
+
+          // If token is expired or about to expire
+          if (now.isAfter(expiration) ||
+              expiration.difference(now).inMinutes < 5) {
+            // Try to refresh the token
+            final refreshSuccess = await _refreshAccessTokenFromServer();
+            if (!refreshSuccess) {
+              // If refresh fails, clear everything
+              await _clearTokens();
+              currentUser = null;
+              return false;
+            }
+          }
+
+          // Load user profile if token is valid
+          await _loadUserProfile();
+          return true;
+        } catch (e) {
+          // Token is invalid, clear it
+          await _clearTokens();
+          currentUser = null;
+          return false;
+        }
+      }
+      return false;
+    } catch (e) {
+      // On any error, log out to be safe
+      await _clearTokens();
+      currentUser = null;
+      return false;
+    }
+  }
+
+  // Clear all cached data
+  void _clearCache() {
+    _cache = {};
+    _cacheTimestamps = {};
   }
 
   // -------------------------------------------------
@@ -877,29 +933,6 @@ class ApiService {
     return currentUser;
   }
 
-  // Métodos públicos para inicialización
-  Future<void> initializeApp() async {
-    try {
-      await loadStoredTokens();
-      final token = await getStoredAccessToken();
-      if (token != null) {
-        try {
-          await loadUserProfile();
-        } catch (e) {
-          // Si hay error al cargar perfil, intentar una vez más
-          try {
-            await Future.delayed(Duration(milliseconds: 500));
-            await loadUserProfile();
-          } catch (e) {
-            // Error persistente al cargar el perfil
-          }
-        }
-      }
-    } catch (e) {
-      // Error en la inicialización, pero la app puede continuar
-    }
-  }
-
   Future<void> loadStoredTokens() async {
     await _loadTokens();
   }
@@ -986,7 +1019,7 @@ class ApiService {
     return null;
   }
 
-  // Método para obtener razas/carreras
+  // Método para obtener todas las carreras
   Future<List<Race>> getRaces() async {
     try {
       final response = await _authenticatedRequest(
@@ -1049,10 +1082,14 @@ class ApiService {
     try {
       final response = await _authenticatedRequest(
         'GET',
-        betsEndpoint,
+        allBetResultsEndpoint,
       );
 
       List<BetResult> results = [];
+
+      if (response == null) {
+        return [];
+      }
 
       if (response is List) {
         results =
@@ -1067,6 +1104,14 @@ class ApiService {
           results = responseResults
               .map((betData) => BetResult.fromJson(betData))
               .toList();
+        } else {
+          // Intentar procesar directamente la respuesta como un BetResult
+          try {
+            final betResult = BetResult.fromJson(response);
+            results = [betResult];
+          } catch (e) {
+            // Error silencioso
+          }
         }
       }
 
@@ -1282,6 +1327,74 @@ class ApiService {
         'error': 'Error de conexión',
         'detail': e.toString()
       };
+    }
+  }
+
+  // Método para obtener las apuestas de la última carrera de un torneo
+  Future<List<BetResult>> getTournamentLastRaceBets(int tournamentId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$tournamentsEndpoint$tournamentId/last_race_bets/',
+      );
+
+      List<BetResult> results = [];
+
+      if (response is List) {
+        results = response.map((data) => BetResult.fromJson(data)).toList();
+      } else if (response is Map<String, dynamic>) {
+        if (response.containsKey('results') && response['results'] is List) {
+          final List<dynamic> resultsData = response['results'];
+          results =
+              resultsData.map((data) => BetResult.fromJson(data)).toList();
+        }
+      }
+
+      return results;
+    } catch (e) {
+      // En caso de error, retornar lista vacía
+      return [];
+    }
+  }
+
+  // Método para obtener la clasificación de un torneo
+  Future<Map<String, dynamic>> getTournamentStandings(int tournamentId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$tournamentsEndpoint$tournamentId/standings/',
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+
+      return {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  // Método para obtener las predicciones de una carrera específica en un torneo
+  Future<Map<String, dynamic>> getTournamentRacePredictions(
+      int tournamentId, int season, int round) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$tournamentsEndpoint$tournamentId/race-predictions/',
+        queryParams: {
+          'season': season.toString(),
+          'round': round.toString(),
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+
+      return {};
+    } catch (e) {
+      return {};
     }
   }
 }

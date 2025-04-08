@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
+// Importaciones web condicionales
+import 'web_imports.dart'
+    if (dart.library.html) 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
@@ -17,13 +19,16 @@ import 'screens/forgot_password_screen.dart';
 import 'screens/edit_profile_screen.dart';
 import 'screens/create_tournament_screen.dart';
 import 'screens/join_tournament_screen.dart';
+import 'screens/tournament_race_screen.dart';
 
 void main() async {
   // Asegurar que Flutter esté inicializado
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Configurar URL strategy para web
-  setUrlStrategy(PathUrlStrategy());
+  // Configurar URL strategy para web solo si estamos en web
+  if (kIsWeb) {
+    setUrlStrategy(PathUrlStrategy());
+  }
 
   // Variable para controlar si se ha cargado correctamente
   bool initialized = false;
@@ -40,6 +45,7 @@ void main() async {
       onTimeout: () {
         // Si hay timeout, seguir de todas formas
         debugPrint('Timeout en inicialización de API, continuando...');
+        return true; // Return true to indicate initialization completed
       },
     );
     initialized = true;

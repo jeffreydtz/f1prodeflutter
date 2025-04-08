@@ -33,8 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchInitialData() async {
-    if (!mounted) return;
-
     setState(() {
       _loading = true;
       _hasError = false;
@@ -42,188 +40,190 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      print('Cargando datos iniciales en HomeScreen');
-
-      // Hacer ambas llamadas en paralelo - ahora utilizarán la caché si está disponible
-      final results = await Future.wait([
-        apiService.getRaces(),
-        apiService.getUserBetResults(),
+      await Future.wait([
+        _fetchRaces(),
+        _fetchBetResults(),
       ]);
 
+      // Una vez que tenemos tanto las carreras como las predicciones, cruzamos los datos
+      _updateRacesWithBetInfo();
+
+      setState(() {
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _loading = false;
+        _hasError = true;
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
+  // Método para actualizar las carreras con la información de predicciones
+  void _updateRacesWithBetInfo() {
+    if (mounted) {
+      setState(() {
+        // Para cada carrera, verificamos si existe una predicción
+        races = races.map((race) {
+          bool hasBet = _checkExistingPrediction(race.season, race.round);
+          // Solo actualizamos hasBet si es necesario
+          if (race.hasBet != hasBet) {
+            return race.copyWith(hasBet: hasBet);
+          }
+          return race;
+        }).toList();
+      });
+    }
+  }
+
+  Future<void> _fetchRaces() async {
+    try {
+      final fetchedRaces = await apiService.getRaces();
       if (mounted) {
         setState(() {
-          races = results[0] as List<Race>;
-          betResults = results[1] as List<BetResult>;
-          _loading = false;
+          races = fetchedRaces;
         });
-
-        print(
-            'Datos cargados: ${races.length} carreras, ${betResults.length} apuestas');
       }
     } catch (e) {
-      print('Error al cargar datos iniciales: $e');
       if (mounted) {
         setState(() {
-          _loading = false;
           _hasError = true;
-          _errorMessage = e.toString();
+          _errorMessage = 'Error al cargar las carreras: ${e.toString()}';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: const Color.fromARGB(255, 255, 17, 0),
-            action: SnackBarAction(
-              label: 'Reintentar',
-              textColor: Colors.white,
-              onPressed: _fetchInitialData,
-            ),
-          ),
-        );
+      }
+    }
+  }
+
+  Future<void> _fetchBetResults() async {
+    try {
+      final results = await apiService.getUserBetResults();
+      if (mounted) {
+        setState(() {
+          betResults = results;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Error al cargar las predicciones: ${e.toString()}';
+        });
       }
     }
   }
 
   bool _checkExistingPrediction(String season, String round) {
-    return betResults
-        .any((result) => result.season == season && result.round == round);
+    // Aquí el problema puede ser el tipo de datos. Asegurémonos de comparar strings
+    bool result = betResults.any((bet) =>
+        bet.season.toString() == season.toString() &&
+        bet.round.toString() == round.toString());
+    return result;
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentYear = DateTime.now().year.toString();
     final isWeb = ResponsiveLayout.isWeb(context);
 
     return Scaffold(
       appBar: isWeb
           ? WebNavbar(
-              title: 'Carreras $currentYear',
+              title: 'F1 Prode',
+              currentIndex: _selectedIndex,
               onRefresh: _fetchInitialData,
               showBackButton: Navigator.canPop(context),
               onBackPressed: () => Navigator.of(context).pop(),
-              currentIndex: _selectedIndex,
             )
           : AppBar(
-              title: Text('Carreras $currentYear'),
-              automaticallyImplyLeading: true,
-              leading: Navigator.canPop(context)
-                  ? IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    )
-                  : null,
+              title: const Text('F1 Prode'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _fetchInitialData,
-                  tooltip: 'Actualizar datos',
                 ),
               ],
-              iconTheme: const IconThemeData(
-                color: Colors.white,
-                size: 28,
-              ),
             ),
-      body: _buildBody(),
-      bottomNavigationBar: isWeb
-          ? null
-          : BottomAppBar(
-              shape: const CircularNotchedRectangle(),
-              shadowColor: Colors.transparent,
-              color: Colors.grey[900],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
-                    onPressed: () {
-                      setState(() {
-                        _selectedIndex = 0;
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.list_number,
-                        color: Colors.white),
-                    onPressed: () {
-                      setState(() {
-                        _selectedIndex = 1;
-                      });
-                      Navigator.pushNamed(context, '/results');
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.person_3_fill,
-                        color: Colors.white),
-                    onPressed: () {
-                      setState(() {
-                        _selectedIndex = 2;
-                      });
-                      Navigator.pushNamed(context, '/tournaments');
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.profile_circled,
-                        color: Colors.white),
-                    onPressed: () {
-                      setState(() {
-                        _selectedIndex = 3;
-                      });
-                      Navigator.pushNamed(context, '/profile');
-                    },
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(
-          child: CircularProgressIndicator(
-              color: Color.fromARGB(255, 255, 17, 0)));
-    }
-
-    if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 60,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Error al cargar datos: $_errorMessage',
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _fetchInitialData,
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _fetchInitialData,
-      child: races.isEmpty
+      body: _loading
           ? const Center(
-              child: Text(
-                'No hay carreras disponibles',
-                style: TextStyle(color: Colors.white),
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 255, 17, 0),
               ),
             )
-          : _buildRacesList(),
+          : _hasError
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 60,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _errorMessage ?? 'Error desconocido',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _fetchInitialData,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              const Color.fromARGB(255, 255, 17, 0),
+                        ),
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                )
+              : _buildRacesList(),
+      bottomNavigationBar: !isWeb
+          ? BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+                switch (index) {
+                  case 0:
+                    Navigator.pushReplacementNamed(context, '/home');
+                    break;
+                  case 1:
+                    Navigator.pushReplacementNamed(context, '/results');
+                    break;
+                  case 2:
+                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    break;
+                  case 3:
+                    Navigator.pushReplacementNamed(context, '/profile');
+                    break;
+                }
+              },
+              type: BottomNavigationBarType.fixed,
+              backgroundColor: const Color.fromARGB(255, 30, 30, 30),
+              selectedItemColor: const Color.fromARGB(255, 255, 17, 0),
+              unselectedItemColor: Colors.white70,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Inicio',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.list_alt),
+                  label: 'Resultados',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.people),
+                  label: 'Torneos',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Perfil',
+                ),
+              ],
+            )
+          : null,
     );
   }
 
@@ -231,7 +231,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isWeb = ResponsiveLayout.isWeb(context);
 
     if (isWeb) {
-      // Layout mejorado para web: rejilla más ancha con más información
       return GridView.builder(
         padding: const EdgeInsets.all(16.0),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -244,7 +243,6 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) => _buildRaceItem(index),
       );
     } else {
-      // Layout móvil: lista vertical
       return ListView.builder(
         padding: const EdgeInsets.all(8.0),
         itemCount: races.length,
@@ -255,19 +253,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildRaceItem(int index) {
     final race = races[index];
-    final hasPrediction = _checkExistingPrediction(race.season, race.round);
-    final raceDate = DateTime.parse(race.date);
-    final raceCompleted = raceDate.isBefore(DateTime.now());
 
     return RaceCard(
-      raceName: race.name,
-      date: race.date,
-      circuit: race.circuit,
-      season: race.season,
-      round: race.round,
-      hasPrediction: hasPrediction,
-      raceCompleted: raceCompleted,
-      onBetPressed: () {
+      race: race,
+      onPredict: () {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -281,19 +270,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ).then((_) {
-          // Actualizar los resultados cuando volvemos de hacer una predicción
           _fetchInitialData();
         });
       },
-      onViewResults: (season, round) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ResultsScreen(
-              initialRaceId: '${season}_$round',
+      onViewResults: () {
+        if (race.hasBet) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ResultsScreen(
+                initialRaceId: '${race.season}_${race.round}',
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
     );
   }

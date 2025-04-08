@@ -10,6 +10,7 @@ class WebNavbar extends StatelessWidget implements PreferredSizeWidget {
   final Function()? onBackPressed;
   final bool showBackButton;
   final int currentIndex;
+  final Function(int)? onIndexChanged;
 
   const WebNavbar({
     Key? key,
@@ -18,6 +19,7 @@ class WebNavbar extends StatelessWidget implements PreferredSizeWidget {
     this.onBackPressed,
     this.showBackButton = false,
     required this.currentIndex,
+    this.onIndexChanged,
   }) : super(key: key);
 
   @override
@@ -165,7 +167,10 @@ class WebNavbar extends StatelessWidget implements PreferredSizeWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onTap,
+          onTap: () {
+            onTap();
+            onIndexChanged?.call(index);
+          },
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding:

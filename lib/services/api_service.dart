@@ -849,52 +849,115 @@ class ApiService {
   // -------------------------------------------------
 
   // Método para obtener el perfil del usuario
-  Future<Map<String, dynamic>> getUserProfile() async {
+  Future<UserModel?> getUserProfile() async {
     try {
-      // Intentar cargar el perfil
-      final profileData = await _loadUserProfile();
-      return profileData;
+      final response = await _authenticatedRequest(
+        'GET',
+        profileEndpoint,
+      );
+
+      if (response != null) {
+        debugPrint('Raw profile response: $response');
+
+        // Extraer los datos del perfil de la estructura anidada
+        final Map<String, dynamic> profileData =
+            response is Map<String, dynamic>
+                ? (response['profile'] as Map<String, dynamic>? ?? response)
+                : {'error': 'Invalid response format'};
+
+        debugPrint('Extracted profile data: $profileData');
+
+        // Crear el modelo de usuario con los datos del perfil
+        final user = UserModel(
+          id: profileData['id']?.toString() ?? '',
+          username: profileData['username'] ?? '',
+          email: profileData['email'] ?? '',
+          password: '',
+          points: profileData['points'] ?? 0,
+          avatar: profileData['avatar'],
+          firstName: profileData['first_name'],
+          lastName: profileData['last_name'],
+          favoriteTeam: profileData['favorite_team'],
+        );
+
+        debugPrint('Created user model: ${user.toJson()}');
+
+        // Actualizar el usuario actual en memoria
+        currentUser = user;
+
+        // Guardar en SharedPreferences
+        final prefs = await _storage;
+        await prefs.setString('user_id', user.id);
+        await prefs.setString('username', user.username);
+        await prefs.setString('email', user.email);
+        await prefs.setInt('points', user.points);
+        if (user.avatar != null) await prefs.setString('avatar', user.avatar!);
+        if (user.firstName != null)
+          await prefs.setString('first_name', user.firstName!);
+        if (user.lastName != null)
+          await prefs.setString('last_name', user.lastName!);
+        if (user.favoriteTeam != null)
+          await prefs.setString('favorite_team', user.favoriteTeam!);
+
+        return user;
+      }
+      return null;
     } catch (e) {
-      rethrow;
+      debugPrint('Error getting user profile: $e');
+      return null;
     }
   }
 
   // Método para actualizar el perfil del usuario
-  Future<Map<String, dynamic>> updateUserProfile(
-      Map<String, dynamic> body) async {
+  Future<bool> updateUserProfile({
+    String? username,
+    String? email,
+    String? password,
+    String? avatar,
+    String? firstName,
+    String? lastName,
+    String? favoriteTeam,
+  }) async {
     try {
+      final currentUser = await getUserProfile();
+      if (currentUser == null) {
+        return false;
+      }
+
+      final userData = {
+        'username': username ?? currentUser.username,
+        'email': email ?? currentUser.email,
+      };
+
+      if (password != null && password.isNotEmpty) {
+        userData['password'] = password;
+      }
+
+      if (avatar != null) {
+        userData['avatar'] = avatar;
+      }
+
+      if (firstName != null) {
+        userData['first_name'] = firstName;
+      }
+
+      if (lastName != null) {
+        userData['last_name'] = lastName;
+      }
+
+      if (favoriteTeam != null) {
+        userData['favorite_team'] = favoriteTeam;
+      }
+
       final response = await _authenticatedRequest(
         'PATCH',
         profileEndpoint,
-        body: body,
+        body: userData,
       );
-
-      if (response is Map<String, dynamic>) {
-        // Si la respuesta contiene el perfil actualizado, actualizar el usuario actual
-        if (response.containsKey('profile') &&
-            response['profile'] is Map<String, dynamic>) {
-          final profileData = response['profile'];
-
-          // Actualizar el currentUser con los datos del perfil
-          currentUser = UserModel(
-            id: profileData['id']?.toString() ?? '',
-            username: profileData['username'] ?? 'Usuario',
-            email: profileData['email'] ?? '',
-            password: '',
-            points: profileData['points'] ?? 0,
-            avatar: profileData['avatar'],
-          );
-
-          // Actualizar la caché
-          _saveToCache('user_profile', profileData);
-        }
-
-        return {'success': true, 'profile': response};
-      } else {
-        throw Exception('Formato de respuesta inválido');
-      }
+      return response != null;
     } catch (e) {
-      return {'success': false, 'error': e.toString()};
+      print('Error updating user profile: $e');
+      return false;
     }
   }
 

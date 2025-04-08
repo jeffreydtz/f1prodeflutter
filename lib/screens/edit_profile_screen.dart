@@ -20,6 +20,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
+  late TextEditingController _favoriteTeamController;
   late TextEditingController _currentPasswordController;
   late TextEditingController _newPasswordController;
   late TextEditingController _confirmPasswordController;
@@ -35,6 +38,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _avatarBase64;
   String? _currentAvatarUrl;
 
+  // Lista de equipos de F1 para el dropdown
+  final List<String> _f1Teams = [
+    'Mercedes',
+    'Red Bull Racing',
+    'Ferrari',
+    'McLaren',
+    'Aston Martin',
+    'Alpine',
+    'Williams',
+    'AlphaTauri',
+    'Sauber',
+    'Haas F1 Team',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +59,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         TextEditingController(text: widget.userData['username'] ?? '');
     _emailController =
         TextEditingController(text: widget.userData['email'] ?? '');
+    _firstNameController = TextEditingController(
+        text: widget.userData['first_name'] ?? widget.userData['nombre'] ?? '');
+    _lastNameController = TextEditingController(
+        text:
+            widget.userData['last_name'] ?? widget.userData['apellido'] ?? '');
+    _favoriteTeamController =
+        TextEditingController(text: widget.userData['favorite_team'] ?? '');
     _currentPasswordController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
@@ -52,6 +76,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _usernameController.dispose();
     _emailController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _favoriteTeamController.dispose();
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
@@ -174,56 +201,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      final Map<String, dynamic> updateData = {
-        'username': _usernameController.text,
-        'email': _emailController.text,
-      };
-
-      // Añadir avatar si se ha seleccionado una nueva imagen
-      if (_avatarBase64 != null) {
-        updateData['avatar'] = _avatarBase64;
-      }
-
-      // Añadir datos de contraseña si se está cambiando
-      if (_changePassword) {
-        updateData['current_password'] = _currentPasswordController.text;
-        updateData['new_password'] = _newPasswordController.text;
-        updateData['new_password_confirm'] = _confirmPasswordController.text;
-      }
-
-      print('Actualizando perfil con datos: $updateData');
-
-      // Llamar al servicio para actualizar el perfil
-      final result = await _apiService.updateUserProfile(updateData);
+      // Actualizar el perfil usando los parámetros correctos del método
+      final success = await _apiService.updateUserProfile(
+        username: _usernameController.text,
+        email: _emailController.text,
+        firstName: _firstNameController.text,
+        lastName: _lastNameController.text,
+        favoriteTeam: _favoriteTeamController.text,
+        avatar: _avatarBase64,
+        password: _changePassword ? _newPasswordController.text : null,
+      );
 
       if (mounted) {
-        if (result['success'] == true) {
+        if (success) {
           // Mostrar mensaje de éxito
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Perfil actualizado correctamente'),
               backgroundColor: Colors.green,
             ),
           );
 
-          // Si se actualizó la contraseña, mostrar mensaje adicional
-          if (result['password_updated'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Contraseña actualizada correctamente'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-
           // Volver a la pantalla anterior
-          Navigator.pop(context, result['profile']);
+          Navigator.pop(context);
         } else {
-          // Mostrar errores
+          // Mostrar error genérico
           setState(() {
             _isLoading = false;
-            _error =
-                result['errors']?.toString() ?? 'Error al actualizar el perfil';
+            _error = 'Error al actualizar el perfil';
           });
         }
       }
@@ -459,6 +464,73 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                       const SizedBox(height: 24),
 
+                      // Sección de información personal
+                      const Text(
+                        'Información personal',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo de nombre
+                      TextFormField(
+                        controller: _firstNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nombre',
+                          hintText: 'Ingrese su nombre',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo de apellido
+                      TextFormField(
+                        controller: _lastNameController,
+                        decoration: InputDecoration(
+                          labelText: 'Apellido',
+                          hintText: 'Ingrese su apellido',
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Campo de equipo favorito (dropdown)
+                      DropdownButtonFormField<String>(
+                        value: _favoriteTeamController.text.isNotEmpty
+                            ? _favoriteTeamController.text
+                            : null,
+                        decoration: InputDecoration(
+                          labelText: 'Equipo favorito',
+                          prefixIcon: const Icon(Icons.sports_motorsports),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.0),
+                          ),
+                        ),
+                        hint: const Text('Seleccione su equipo favorito'),
+                        items: _f1Teams.map((String team) {
+                          return DropdownMenuItem<String>(
+                            value: team,
+                            child: Text(team),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _favoriteTeamController.text = newValue;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
                       // Sección de cambio de contraseña
                       Row(
                         children: [
@@ -559,23 +631,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _updateProfile,
+                          onPressed: _updateProfile,
                           style: ElevatedButton.styleFrom(
                             backgroundColor:
                                 const Color.fromARGB(255, 255, 17, 0),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8.0),
-                            ),
+                            minimumSize: const Size(double.infinity, 54),
                           ),
-                          child: const Text(
-                            'GUARDAR CAMBIOS',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 3,
+                                )
+                              : const Text(
+                                  'Actualizar Perfil',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ),
                     ],

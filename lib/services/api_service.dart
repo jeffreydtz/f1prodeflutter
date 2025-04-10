@@ -10,6 +10,7 @@ import '../models/user.dart';
 import '../models/race.dart';
 import '../models/bet.dart';
 import '../models/tournament.dart';
+import '../models/sanction.dart';
 
 class ApiService {
   // Singleton
@@ -1381,6 +1382,81 @@ class ApiService {
       return {};
     } catch (e) {
       return {};
+    }
+  }
+
+  // Método para obtener las sanciones de un torneo
+  Future<List<Sanction>> getTournamentSanctions(int tournamentId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$tournamentsEndpoint$tournamentId/sanctions/',
+      );
+
+      List<Sanction> sanctions = [];
+
+      if (response is List) {
+        sanctions = response.map((data) => Sanction.fromJson(data)).toList();
+      } else if (response is Map<String, dynamic>) {
+        if (response.containsKey('results') && response['results'] is List) {
+          final List<dynamic> resultsData = response['results'];
+          sanctions =
+              resultsData.map((data) => Sanction.fromJson(data)).toList();
+        } else if (response.containsKey('sanctions') &&
+            response['sanctions'] is List) {
+          final List<dynamic> sanctionsData = response['sanctions'];
+          sanctions =
+              sanctionsData.map((data) => Sanction.fromJson(data)).toList();
+        }
+      }
+
+      return sanctions;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Método para aplicar una sanción en un torneo
+  Future<Map<String, dynamic>> applyTournamentSanction(
+      int tournamentId, String username, int points, String reason) async {
+    try {
+      final response = await _authenticatedRequest(
+        'POST',
+        '$tournamentsEndpoint$tournamentId/sanctions/',
+        body: {'username': username, 'points': points, 'reason': reason},
+      );
+
+      if (response is Map<String, dynamic>) {
+        if (response.containsKey('id')) {
+          return {
+            'success': true,
+            'sanction': Sanction.fromJson(response),
+          };
+        } else if (response.containsKey('success') &&
+            response['success'] == true) {
+          return {'success': true, 'sanction': response['sanction']};
+        }
+      }
+
+      return {'success': false, 'error': 'Formato de respuesta inválido'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // Método para eliminar una sanción
+  Future<bool> deleteTournamentSanction(
+      int tournamentId, int sanctionId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'DELETE',
+        '$tournamentsEndpoint$tournamentId/sanctions/$sanctionId/',
+      );
+
+      // Si es una petición DELETE exitosa, la respuesta puede ser null o vacía con código 204
+      return response == null || (response is Map && response.isEmpty);
+    } catch (e) {
+      return false;
     }
   }
 }

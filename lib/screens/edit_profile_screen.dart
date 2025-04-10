@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'dart:convert';
 import 'dart:typed_data';
-import '../utils/image_picker_interface.dart';
-import 'package:image_picker/image_picker.dart';
+// import '../utils/image_picker_interface.dart';
+// import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class EditProfileScreen extends StatefulWidget {
@@ -18,7 +18,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final ApiService _apiService = ApiService();
-  final ImagePicker _picker = ImagePicker();
+  // final ImagePicker _picker = ImagePicker();
 
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
@@ -36,20 +36,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _emailAvailable = true;
   bool _checkingUsername = false;
   bool _checkingEmail = false;
-  Uint8List? _selectedImage;
-  String? _avatarBase64;
-  String? _currentAvatarUrl;
+  // Uint8List? _selectedImage;
+  // String? _avatarBase64;
+  // String? _currentAvatarUrl;
 
   // Lista de equipos de F1 para el dropdown
   final List<String> _f1Teams = [
     'Mercedes',
-    'Red Bull Racing',
+    'Red Bull',
     'Ferrari',
     'McLaren',
     'Aston Martin',
     'Alpine',
     'Williams',
-    'AlphaTauri',
+    'Visa Cash App RB',
     'Sauber',
     'Haas F1 Team',
   ];
@@ -71,7 +71,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _currentPasswordController = TextEditingController();
     _newPasswordController = TextEditingController();
     _confirmPasswordController = TextEditingController();
-    _currentAvatarUrl = widget.userData['avatar'];
+    // _currentAvatarUrl = widget.userData['avatar'];
   }
 
   @override
@@ -87,26 +87,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _selectImage() async {
-    try {
-      final result = await ImagePickerInterface.pickImage();
+  // Future<void> _selectImage() async {
+  //   try {
+  //     final result = await ImagePickerInterface.pickImage();
 
-      if (result != null) {
-        setState(() {
-          _selectedImage = result['bytes'];
-          _avatarBase64 = result['base64'];
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Error al seleccionar la imagen. Por favor, intenta de nuevo.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+  //     if (result != null) {
+  //       setState(() {
+  //         _selectedImage = result['bytes'];
+  //         _avatarBase64 = result['base64'];
+  //       });
+  //     }
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text(
+  //             'Error al seleccionar la imagen. Por favor, intenta de nuevo.'),
+  //         backgroundColor: Colors.red,
+  //       ),
+  //     );
+  //   }
+  // }
 
   Future<void> _checkUsernameAvailability(String username) async {
     if (username.isEmpty || username == widget.userData['username']) {
@@ -206,7 +206,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         favoriteTeam: _favoriteTeamController.text,
-        avatar: _avatarBase64,
+        // avatar: _avatarBase64,
         password: _changePassword ? _newPasswordController.text : null,
       );
 
@@ -274,70 +274,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Sección de avatar
-                      Center(
-                        child: Column(
-                          children: [
-                            GestureDetector(
-                              onTap: _selectImage,
-                              child: Container(
-                                width: 120,
-                                height: 120,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[800],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color:
-                                        const Color.fromARGB(255, 255, 17, 0),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: _selectedImage != null
-                                    ? ClipOval(
-                                        child: Image.memory(
-                                          _selectedImage!,
-                                          fit: BoxFit.cover,
-                                          width: 116,
-                                          height: 116,
-                                        ),
-                                      )
-                                    : _currentAvatarUrl != null
-                                        ? ClipOval(
-                                            child: Image.network(
-                                              _currentAvatarUrl!,
-                                              fit: BoxFit.cover,
-                                              width: 116,
-                                              height: 116,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                return Icon(
-                                                  Icons.person,
-                                                  color: Colors.white,
-                                                  size: 60,
-                                                );
-                                              },
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.person,
-                                            color: Colors.white,
-                                            size: 60,
-                                          ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: _selectImage,
-                              child: const Text(
-                                'Cambiar Foto',
-                                style: TextStyle(
-                                  color: Color.fromARGB(255, 255, 17, 0),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                       const SizedBox(height: 24),
 
                       if (_error != null)

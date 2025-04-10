@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/tournament.dart';
 import '../models/betresult.dart';
+import '../models/sanction.dart';
 import '../services/api_service.dart';
 import 'tournament_race_screen.dart';
 
@@ -21,24 +22,38 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
   late TabController _tabController;
   final ApiService apiService = ApiService();
   List<BetResult> _lastRaceBets = [];
+  List<Sanction> _sanctions = [];
   bool _isLoadingBets = false;
   bool _isLoadingStandings = false;
+  bool _isLoadingSanctions = false;
   Map<String, dynamic> _tournamentStandings = {};
   List<dynamic> _races = [];
+
+  // Controladores para el formulario de sanciones
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _pointsController = TextEditingController();
+  final TextEditingController _reasonController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController =
+        TabController(length: widget.tournament.isCreator ? 4 : 3, vsync: this);
     _fetchTournamentStandings();
     if (widget.tournament.lastRace != null) {
       _fetchLastRaceBets();
+    }
+    if (widget.tournament.isCreator) {
+      _fetchTournamentSanctions();
     }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _usernameController.dispose();
+    _pointsController.dispose();
+    _reasonController.dispose();
     super.dispose();
   }
 
@@ -93,6 +108,134 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
     }
   }
 
+  Future<void> _fetchTournamentSanctions() async {
+    setState(() => _isLoadingSanctions = true);
+    try {
+      final sanctions =
+          await apiService.getTournamentSanctions(widget.tournament.id);
+      if (mounted) {
+        setState(() {
+          _sanctions = sanctions;
+          _isLoadingSanctions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar las sanciones: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() => _isLoadingSanctions = false);
+    }
+  }
+
+  Future<void> _applyTournamentSanction() async {
+    // Validar que todos los campos estén completos
+    if (_usernameController.text.isEmpty ||
+        _pointsController.text.isEmpty ||
+        _reasonController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Todos los campos son obligatorios'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Validar que los puntos sean un número válido
+    int? points = int.tryParse(_pointsController.text);
+    if (points == null || points <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Los puntos deben ser un número positivo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await apiService.applyTournamentSanction(
+        widget.tournament.id,
+        _usernameController.text,
+        points,
+        _reasonController.text,
+      );
+
+      if (result['success'] == true) {
+        // Limpiar el formulario
+        _usernameController.clear();
+        _pointsController.clear();
+        _reasonController.clear();
+
+        // Actualizar la lista de sanciones y la clasificación
+        _fetchTournamentSanctions();
+        _fetchTournamentStandings();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sanción aplicada correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al aplicar la sanción: ${result['error']}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al aplicar la sanción: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteTournamentSanction(int sanctionId) async {
+    try {
+      final result = await apiService.deleteTournamentSanction(
+        widget.tournament.id,
+        sanctionId,
+      );
+
+      if (result) {
+        // Actualizar la lista de sanciones y la clasificación
+        _fetchTournamentSanctions();
+        _fetchTournamentStandings();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sanción eliminada correctamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al eliminar la sanción'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al eliminar la sanción: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -100,10 +243,11 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
         title: Text(widget.tournament.name),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Tabla General'),
-            Tab(text: 'Última Carrera'),
-            Tab(text: 'Historial'),
+          tabs: [
+            const Tab(text: 'Tabla General'),
+            const Tab(text: 'Última Carrera'),
+            const Tab(text: 'Historial'),
+            if (widget.tournament.isCreator) const Tab(text: 'Sanciones'),
           ],
         ),
       ),
@@ -113,6 +257,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
           _buildOverallStandings(),
           _buildLatestRaceResults(),
           _buildRacesHistory(),
+          if (widget.tournament.isCreator) _buildSanctionsTab(),
         ],
       ),
     );
@@ -131,42 +276,86 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
             .toList()
         : widget.tournament.participants;
 
+    final userPosition =
+        _tournamentStandings['user_position'] ?? widget.tournament.userPosition;
+    final userPoints =
+        _tournamentStandings['user_points'] ?? widget.tournament.userPoints;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Tu posición actual
+        // Tu posición actual - Versión mejorada
         Card(
           color: Colors.grey[900],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: const Color.fromARGB(255, 255, 17, 0).withOpacity(0.5),
+              width: 1.5,
+            ),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
               children: [
                 const Text(
                   'Tu Posición Actual',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      '${_tournamentStandings['user_position'] ?? widget.tournament.userPosition}°',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: _getPositionColor(userPosition),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '$userPosition°',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '${_tournamentStandings['user_points'] ?? widget.tournament.userPoints} pts',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                      ),
+                    const SizedBox(width: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tus Puntos',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$userPoints',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+                if (participants.isNotEmpty &&
+                    userPosition > 0 &&
+                    userPosition <= participants.length) ...[
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 8),
+
+                  // Información sobre la diferencia de puntos con el líder o el siguiente
+                  _buildPointsDifference(
+                      participants, userPosition, userPoints),
+                ],
               ],
             ),
           ),
@@ -254,6 +443,55 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  // Método para construir la información sobre la diferencia de puntos
+  Widget _buildPointsDifference(
+      List<Participant> participants, int userPosition, int userPoints) {
+    if (participants.isEmpty) return const SizedBox.shrink();
+
+    String message = '';
+    int difference = 0;
+    Color messageColor = Colors.white70;
+
+    // Si el usuario no es el primero, muestra diferencia con el líder
+    if (userPosition > 1) {
+      final leaderPoints = participants.isNotEmpty ? participants[0].points : 0;
+      difference = leaderPoints - userPoints;
+      message = 'A $difference puntos del líder';
+      messageColor = Colors.orange;
+
+      // También muestra cuántos puntos faltan para avanzar una posición
+      if (userPosition > 1 && userPosition <= participants.length) {
+        final aheadPosition =
+            userPosition - 2; // Índice de la posición anterior
+        if (aheadPosition >= 0 && aheadPosition < participants.length) {
+          final aheadPoints = participants[aheadPosition].points;
+          final pointsToAdvance = aheadPoints - userPoints;
+          if (pointsToAdvance > 0) {
+            message += ' • Necesitas $pointsToAdvance puntos para avanzar';
+          }
+        }
+      }
+    } else {
+      // Si el usuario es el primero, muestra ventaja sobre el segundo
+      if (participants.length > 1) {
+        final secondPoints = participants[1].points;
+        difference = userPoints - secondPoints;
+        message = '$difference puntos de ventaja sobre el segundo';
+        messageColor = Colors.green;
+      }
+    }
+
+    return Text(
+      message,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: messageColor,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
     );
   }
 
@@ -459,10 +697,229 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
     );
   }
 
+  Widget _buildSanctionsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Formulario para aplicar sanciones
+        Card(
+          color: Colors.grey[900],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Aplicar Nueva Sanción',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _usernameController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Usuario',
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Color(0xFF303030),
+                    border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _pointsController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Puntos a descontar',
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Color(0xFF303030),
+                    border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _reasonController,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo',
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Color(0xFF303030),
+                    border: OutlineInputBorder(),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white24),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.red),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _applyTournamentSanction,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      'APLICAR SANCIÓN',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Lista de sanciones aplicadas
+        Card(
+          color: Colors.grey[900],
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Sanciones Aplicadas',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_isLoadingSanctions)
+                  const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.red,
+                    ),
+                  )
+                else if (_sanctions.isEmpty)
+                  const Center(
+                    child: Text(
+                      'No hay sanciones aplicadas',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _sanctions.length,
+                    separatorBuilder: (context, index) => const Divider(
+                      color: Colors.white24,
+                    ),
+                    itemBuilder: (context, index) {
+                      final sanction = _sanctions[index];
+                      return ListTile(
+                        title: Text(
+                          sanction.username,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Puntos: -${sanction.points}',
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Motivo: ${sanction.reason}',
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            Text(
+                              'Fecha: ${sanction.createdAt}',
+                              style: const TextStyle(
+                                  color: Colors.white54, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => _showDeleteConfirmation(sanction),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDeleteConfirmation(Sanction sanction) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text(
+          'Eliminar Sanción',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          '¿Estás seguro que deseas eliminar la sanción aplicada a ${sanction.username}? Se revertirán los puntos descontados.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteTournamentSanction(sanction.id);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildParticipantRow(int index, Participant participant) {
     final bool isCurrentUser = participant.userId ==
         widget
             .tournament.participants[widget.tournament.userPosition - 1].userId;
+
+    // Verificar si el participante tiene sanciones
+    final bool hasSanctions =
+        participant.sanctions != null && participant.sanctions!.count > 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -494,9 +951,36 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  participant.username,
-                  style: const TextStyle(color: Colors.white),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          participant.username,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        if (hasSanctions)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0),
+                            child: Tooltip(
+                              message:
+                                  'Penalización: -${participant.sanctions!.totalPoints} puntos',
+                              child: Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.amber,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (hasSanctions)
+                      Text(
+                        'Sanciones: ${participant.sanctions!.count} (-${participant.sanctions!.totalPoints} pts)',
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                  ],
                 ),
               ),
               Text(

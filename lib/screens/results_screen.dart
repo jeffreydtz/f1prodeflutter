@@ -432,6 +432,16 @@ class _ResultsScreenState extends State<ResultsScreen>
         _buildSectionTitle('Tu Top 10'),
         const SizedBox(height: 8),
         _buildTop10List(bet.top10User),
+
+        // Mostrar predicciones de sprint si la carrera tiene sprint
+        if (bet.hasSprint &&
+            bet.sprintTop10User != null &&
+            bet.sprintTop10User!.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildSectionTitle('Sprint Race - Top 8'),
+          const SizedBox(height: 8),
+          _buildTop10List(bet.sprintTop10User!),
+        ],
       ],
     );
   }
@@ -472,6 +482,19 @@ class _ResultsScreenState extends State<ResultsScreen>
           prediction: bet.fastestLapUser,
           result: bet.fastestLapReal,
         ),
+
+        // Mostrar resultados de sprint si la carrera tiene sprint
+        if (bet.hasSprint &&
+            bet.sprintTop10User != null &&
+            bet.sprintTop10User!.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _buildSectionTitle('Sprint Race - Top 8'),
+          const SizedBox(height: 8),
+          if (bet.sprintTop10Real != null && bet.sprintTop10Real!.isNotEmpty)
+            _buildTop10Comparison(bet.sprintTop10User!, bet.sprintTop10Real!)
+          else
+            _buildTop10List(bet.sprintTop10User!),
+        ],
 
         if (bet.pointsBreakdown.isNotEmpty) ...[
           const SizedBox(height: 24),

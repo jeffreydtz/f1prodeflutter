@@ -30,8 +30,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Aston Martin': const Color(0xFF006F62),
     'Alpine': const Color(0xFF0090FF),
     'Williams': const Color(0xFF005AFF),
-    'AlphaTauri': const Color(0xFF2B4562),
-    'Sauber': const Color(0xFF900000),
+    'Visa Cash App RB': const Color.fromARGB(255, 106, 143, 185),
+    'Sauber': const Color.fromARGB(255, 1, 232, 74),
     'Haas F1 Team': const Color(0xFFFFFFFF),
   };
 

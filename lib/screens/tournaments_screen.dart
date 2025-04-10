@@ -35,7 +35,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     try {
       final data = await apiService.getTournaments();
       setState(() {
-        tournaments = data;
+        tournaments = data
+          ..sort((a, b) => b.userPoints.compareTo(a.userPoints));
         isLoading = false;
       });
     } catch (e) {
@@ -426,8 +427,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       name: tournament.name,
       inviteCode: tournament.inviteCode,
       participantsCount: tournament.participants?.length ?? 0,
-      position: tournament.userPosition ?? 0,
-      points: tournament.userPoints ?? 0,
+      position: tournament.userPosition,
+      points: tournament.userPoints,
       onTap: () {
         Navigator.push(
           context,

@@ -1,3 +1,5 @@
+import 'sanction.dart';
+
 class Tournament {
   final int id;
   final String name;
@@ -7,6 +9,7 @@ class Tournament {
   final int userPoints;
   final LastRace? lastRace;
   final String? invitationCode;
+  final bool isCreator; // Indica si el usuario actual es el creador del torneo
 
   Tournament({
     required this.id,
@@ -17,6 +20,7 @@ class Tournament {
     required this.userPoints,
     this.lastRace,
     this.invitationCode,
+    this.isCreator = false,
   });
 
   factory Tournament.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,7 @@ class Tournament {
               ? LastRace.fromJson(json['lastRace'])
               : null,
       invitationCode: json['invitation_code'] ?? json['inviteCode'],
+      isCreator: json['is_creator'] ?? false,
     );
   }
 }
@@ -68,6 +73,7 @@ class Participant {
   final int points;
   final int? lastRacePoints;
   final String? avatar;
+  final SanctionInfo? sanctions;
 
   Participant({
     required this.userId,
@@ -75,6 +81,7 @@ class Participant {
     required this.points,
     this.lastRacePoints,
     this.avatar,
+    this.sanctions,
   });
 
   factory Participant.fromJson(Map<String, dynamic> json) {
@@ -84,6 +91,9 @@ class Participant {
       points: json['points'],
       lastRacePoints: json['last_race_points'],
       avatar: json['avatar'],
+      sanctions: json.containsKey('sanctions')
+          ? SanctionInfo.fromJson(json['sanctions'])
+          : null,
     );
   }
 }

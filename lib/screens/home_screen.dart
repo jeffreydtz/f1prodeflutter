@@ -8,6 +8,8 @@ import '../screens/bet_screen.dart';
 import '../screens/results_screen.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
+import '../theme/f1_theme.dart';
+import '../widgets/f1_widgets.dart';
 import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
@@ -136,50 +138,35 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : AppBar(
               title: const Text('F1 Prode'),
+              backgroundColor: F1Theme.carbonBlack,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: const Icon(Icons.refresh_rounded),
                   onPressed: _fetchInitialData,
+                  style: IconButton.styleFrom(
+                    backgroundColor: F1Theme.f1Red.withOpacity(0.1),
+                    foregroundColor: F1Theme.f1Red,
+                  ),
                 ),
+                const SizedBox(width: F1Theme.s),
               ],
             ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Color.fromARGB(255, 255, 17, 0),
+          ? Center(
+              child: F1LoadingIndicator(
+                message: 'Cargando carreras...',
               ),
             )
           : _hasError
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 60,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage ?? 'Error desconocido',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _fetchInitialData,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color.fromARGB(255, 255, 17, 0),
-                        ),
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
-                  ),
+              ? F1ErrorState(
+                  title: 'Error al cargar',
+                  subtitle: _errorMessage ?? 'Error desconocido',
+                  actionText: 'Reintentar',
+                  onAction: _fetchInitialData,
                 )
               : _buildRacesList(),
       bottomNavigationBar: !isWeb
-          ? BottomNavigationBar(
+          ? F1BottomNavigation(
               currentIndex: _selectedIndex,
               onTap: (index) {
                 setState(() {
@@ -200,25 +187,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     break;
                 }
               },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: const Color.fromARGB(255, 30, 30, 30),
-              selectedItemColor: const Color.fromARGB(255, 255, 17, 0),
-              unselectedItemColor: Colors.white70,
               items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.home,
+                  activeIcon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.list_alt),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.list_bullet,
+                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.group,
+                  activeIcon: CupertinoIcons.group_solid,
                   label: 'Torneos',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person_circle,
+                  activeIcon: CupertinoIcons.person_circle_fill,
                   label: 'Perfil',
                 ),
               ],
@@ -228,32 +215,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildRacesList() {
-    final isWeb = ResponsiveLayout.isWeb(context);
-
-    if (isWeb) {
-      return GridView.builder(
-        padding: const EdgeInsets.all(16.0),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 1.8,
-          crossAxisSpacing: 12.0,
-          mainAxisSpacing: 12.0,
-        ),
-        itemCount: races.length,
-        itemBuilder: (context, index) => _buildRaceItem(index),
-      );
-    } else {
-      return ListView.builder(
-        padding: const EdgeInsets.all(8.0),
-        itemCount: races.length,
-        itemBuilder: (context, index) => _buildRaceItem(index),
+    if (races.isEmpty) {
+      return F1EmptyState(
+        icon: Icons.sports_motorsports,
+        title: 'No hay carreras disponibles',
+        subtitle: 'Las carreras aparecerán aquí cuando estén disponibles',
+        actionText: 'Actualizar',
+        onAction: _fetchInitialData,
       );
     }
+
+    return ResponsiveGrid(
+      mobileColumns: 1,
+      tabletColumns: 2,
+      desktopColumns: 3,
+      childAspectRatio: ResponsiveLayout.isMobile(context) ? 0.8 : 1.1,
+      children: races.map((race) => _buildRaceItem(race)).toList(),
+    );
   }
 
-  Widget _buildRaceItem(int index) {
-    final race = races[index];
-
+  Widget _buildRaceItem(Race race) {
     return RaceCard(
       race: race,
       onPredict: () {

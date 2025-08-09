@@ -269,17 +269,66 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
     }
 
     // Usar los datos del nuevo endpoint si están disponibles, sino usar los datos del torneo
-    final participants = _tournamentStandings.containsKey('participants') &&
+    var participants = _tournamentStandings.containsKey('participants') &&
             _tournamentStandings['participants'] is List
         ? (_tournamentStandings['participants'] as List)
             .map((p) => Participant.fromJson(p))
             .toList()
         : widget.tournament.participants;
 
-    final userPosition =
-        _tournamentStandings['user_position'] ?? widget.tournament.userPosition;
-    final userPoints =
-        _tournamentStandings['user_points'] ?? widget.tournament.userPoints;
+    // Ordenar participantes por puntos (de mayor a menor)
+    participants = List.from(participants)
+      ..sort((a, b) => b.points.compareTo(a.points));
+
+    // Obtener el ApiService para conseguir el usuario actual
+    final apiService = ApiService();
+    final currentUser = apiService.getCurrentUser();
+
+    // Buscar la posición del usuario actual en la lista ordenada
+    int userPosition = 0;
+    int userPoints = 0;
+
+    if (currentUser != null) {
+      // Buscar al usuario actual por su username
+      for (int i = 0; i < participants.length; i++) {
+        if (participants[i].username == currentUser.username) {
+          userPosition = i + 1;
+          userPoints = participants[i].points;
+          break;
+        }
+      }
+    }
+
+    // Si no encontramos al usuario por username, usar el método anterior como respaldo
+    if (userPosition == 0) {
+      // Determinar el ID del usuario actual
+      final userIdToFind = widget.tournament.participants.isNotEmpty
+          ? widget.tournament.participants[widget.tournament.userPosition - 1]
+              .userId
+          : -1;
+
+      // Encontrar la posición real del usuario en la lista ordenada
+      for (int i = 0; i < participants.length; i++) {
+        if (participants[i].userId == userIdToFind) {
+          userPosition = i + 1;
+          userPoints = participants[i].points;
+          break;
+        }
+      }
+    }
+
+    // Si todavía no encontramos al usuario, mostrar mensaje de debug
+    if (userPosition == 0 && participants.isNotEmpty) {
+      debugPrint(
+          '⚠️ No se pudo encontrar al usuario actual en la lista de participantes');
+      debugPrint('Username: ${currentUser?.username}');
+      debugPrint(
+          'Participantes disponibles: ${participants.map((p) => p.username).join(', ')}');
+
+      // Como último recurso, usar la primera posición
+      userPosition = 1;
+      userPoints = participants.first.points;
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -410,7 +459,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
         ),
         const SizedBox(height: 20),
 
-        // Lista de participantes
+        // Lista de participantes ordenada
         Card(
           color: Colors.grey[900],
           child: Padding(
@@ -437,7 +486,14 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
                 ),
                 const SizedBox(height: 16),
                 ...participants.asMap().entries.map(
-                    (entry) => _buildParticipantRow(entry.key, entry.value)),
+                      (entry) => _buildParticipantRow(
+                        entry.key,
+                        entry.value,
+                        currentUser != null &&
+                            participants[entry.key].username ==
+                                currentUser.username,
+                      ),
+                    ),
               ],
             ),
           ),
@@ -912,11 +968,8 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
     );
   }
 
-  Widget _buildParticipantRow(int index, Participant participant) {
-    final bool isCurrentUser = participant.userId ==
-        widget
-            .tournament.participants[widget.tournament.userPosition - 1].userId;
-
+  Widget _buildParticipantRow(
+      int index, Participant participant, bool isCurrentUser) {
     // Verificar si el participante tiene sanciones
     final bool hasSanctions =
         participant.sanctions != null && participant.sanctions!.count > 0;

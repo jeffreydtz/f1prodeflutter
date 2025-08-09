@@ -1,11 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
+import 'theme/f1_theme.dart';
 // Importaciones web condicionales
 import 'web_imports.dart'
     if (dart.library.html) 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -16,10 +15,8 @@ import 'screens/bet_screen.dart';
 import 'screens/tournaments_screen.dart';
 import 'screens/results_screen.dart';
 import 'screens/forgot_password_screen.dart';
-import 'screens/edit_profile_screen.dart';
 import 'screens/create_tournament_screen.dart';
 import 'screens/join_tournament_screen.dart';
-import 'screens/tournament_race_screen.dart';
 
 void main() async {
   // Asegurar que Flutter esté inicializado
@@ -91,31 +88,8 @@ class _MyAppState extends State<MyApp> {
       navigatorKey: navigatorKey,
       title: 'F1 Prode',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primaryColor: const Color.fromARGB(255, 255, 17, 0),
-        colorScheme: ColorScheme.dark(
-          primary: const Color.fromARGB(255, 255, 17, 0),
-          secondary: const Color.fromARGB(255, 255, 17, 0),
-        ),
-        scaffoldBackgroundColor: Colors.black,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyMedium: TextStyle(color: Colors.white),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 255, 17, 0),
-          ),
-        ),
-      ),
+      theme: F1Theme.darkTheme,
+      themeMode: ThemeMode.dark,
       home: SplashScreen(
         apiService: widget.apiService,
         onInitialized: (bool success) {

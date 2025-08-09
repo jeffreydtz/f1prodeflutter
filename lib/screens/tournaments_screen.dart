@@ -429,6 +429,8 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       participantsCount: tournament.participants?.length ?? 0,
       position: tournament.userPosition,
       points: tournament.userPoints,
+      isCreator: tournament.isCreator,
+      tournamentId: tournament.id,
       onTap: () {
         Navigator.push(
           context,

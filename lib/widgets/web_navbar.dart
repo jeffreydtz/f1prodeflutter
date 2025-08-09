@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
+import '../theme/f1_theme.dart';
+import 'f1_widgets.dart';
 
 /// Barra de navegación superior para la interfaz web
 /// con estilo de F1 Prode
@@ -23,7 +25,7 @@ class WebNavbar extends StatelessWidget implements PreferredSizeWidget {
   }) : super(key: key);
 
   @override
-  Size get preferredSize => const Size.fromHeight(70.0);
+  Size get preferredSize => const Size.fromHeight(80.0);
 
   @override
   Widget build(BuildContext context) {
@@ -33,46 +35,86 @@ class WebNavbar extends StatelessWidget implements PreferredSizeWidget {
     return Container(
       height: preferredSize.height,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black,
-            const Color.fromARGB(255, 30, 30, 30),
-          ],
+        gradient: F1Theme.carbonGradient,
+        border: const Border(
+          bottom: BorderSide(
+            color: F1Theme.borderGrey,
+            width: 2,
+          ),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            spreadRadius: 5,
-            blurRadius: 7,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Logo y título
+          // Logo and title section
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            padding: const EdgeInsets.symmetric(horizontal: F1Theme.l),
             child: Row(
               children: [
                 if (showBackButton && onBackPressed != null)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: onBackPressed,
+                  Container(
+                    margin: const EdgeInsets.only(right: F1Theme.m),
+                    child: IconButton(
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      onPressed: onBackPressed,
+                      style: IconButton.styleFrom(
+                        backgroundColor: F1Theme.f1Red.withOpacity(0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(F1Theme.radiusM),
+                          side: BorderSide(
+                            color: F1Theme.f1Red.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                Image.asset(
-                  'assets/f1_logo.png',
-                  height: 40,
+                // F1 Brand container
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: F1Theme.m,
+                    vertical: F1Theme.s,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: F1Theme.f1RedGradient,
+                    borderRadius: BorderRadius.circular(F1Theme.radiusM),
+                    boxShadow: F1Theme.coloredShadow(F1Theme.f1Red),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.sports_motorsports,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                      const SizedBox(width: F1Theme.s),
+                      Text(
+                        'F1',
+                        style: F1Theme.headlineMedium.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: F1Theme.m),
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                  style: F1Theme.headlineMedium.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

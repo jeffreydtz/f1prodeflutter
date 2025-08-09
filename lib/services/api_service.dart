@@ -19,8 +19,7 @@ class ApiService {
   ApiService._internal();
 
   /// URL base del backend Django
-  static const String baseUrl =
-      'https://f1prodedjango-production.up.railway.app/api';
+  static const String baseUrl = 'https://f1prodedjango.vercel.app/api';
 
   /// Variable para almacenar el usuario logueado
   UserModel? currentUser;
@@ -35,39 +34,56 @@ class ApiService {
   static const Duration _cacheDuration = Duration(minutes: 30);
 
   // Endpoints
-  static const String loginEndpoint = '/token/';
-  static const String refreshEndpoint = '/token/refresh/';
+  static const String loginEndpoint = '/users/token/';
+  static const String refreshEndpoint = '/users/token/refresh/';
   static const String registerEndpoint = '/users/register/';
   static const String profileEndpoint = '/users/profile/';
-  static const String racesEndpoint = '/f1/races/';
-  static const String driversEndpoint = '/f1/drivers/';
-  static const String betsEndpoint = '/bets/';
-  static const String allBetResultsEndpoint = '/bets/all-results/';
-  static const String tournamentsEndpoint = '/tournaments/';
+  static const String checkAvailabilityEndpoint = '/users/check-availability/';
   static const String passwordResetEndpoint = '/users/password-reset/';
   static const String passwordResetConfirmEndpoint =
       '/users/password-reset-confirm/';
+  static const String racesEndpoint = '/f1/races/';
+  static const String upcomingRacesEndpoint = '/f1/upcoming-races/';
+  static const String driversEndpoint = '/f1/drivers/';
+  static const String betsEndpoint = '/bets/';
+  static const String allBetResultsEndpoint = '/bets/all-results/';
+  static const String updateRaceResultsEndpoint = '/bets/update_race_results/';
+  static const String tournamentsEndpoint = '/tournaments/';
+  static const String joinTournamentEndpoint = '/tournaments/join/';
 
   final _storage = SharedPreferences.getInstance();
 
   // -------------------------------------------------
   // 1. REGISTER (CREACIÓN DE USUARIO)
   // -------------------------------------------------
-  Future<Map<String, dynamic>> register(
-      String username, String email, String password, String passwordConfirm,
-      {String? avatarBase64}) async {
+  Future<Map<String, dynamic>> register({
+    required String username,
+    required String email,
+    required String password,
+    String? firstName,
+    String? lastName,
+    String? favoriteTeam,
+    String? avatarBase64,
+  }) async {
     try {
-      // Imprimir la URL para depuración
       final registerUrl = '$baseUrl$registerEndpoint';
 
       final Map<String, dynamic> requestBody = {
         'username': username,
         'email': email,
         'password': password,
-        'password_confirm': passwordConfirm,
       };
 
-      // Añadir avatar si se proporciona
+      // Añadir campos opcionales según la API
+      if (firstName != null && firstName.isNotEmpty) {
+        requestBody['first_name'] = firstName;
+      }
+      if (lastName != null && lastName.isNotEmpty) {
+        requestBody['last_name'] = lastName;
+      }
+      if (favoriteTeam != null && favoriteTeam.isNotEmpty) {
+        requestBody['favorite_team'] = favoriteTeam;
+      }
       if (avatarBase64 != null && avatarBase64.isNotEmpty) {
         requestBody['avatar'] = avatarBase64;
       }
@@ -84,7 +100,11 @@ class ApiService {
       final data = jsonDecode(utf8.decode(response.bodyBytes));
 
       if (response.statusCode == 201) {
-        return {'success': true, 'user': data['user']};
+        return {
+          'success': data['success'] ?? true,
+          'message': data['message'] ?? 'Usuario creado exitosamente',
+          'user': data['user']
+        };
       } else {
         return {'success': false, 'errors': data};
       }
@@ -788,16 +808,14 @@ class ApiService {
         profileEndpoint,
       );
 
-      if (response != null) {
-        // Extraer los datos del perfil de la estructura anidada
+      if (response != null && response['success'] == true) {
+        // Extraer los datos del perfil según la estructura de la API
         final Map<String, dynamic> profileData =
-            response is Map<String, dynamic>
-                ? (response['profile'] as Map<String, dynamic>? ?? response)
-                : {'error': 'Invalid response format'};
+            response['profile'] as Map<String, dynamic>;
 
         // Crear el modelo de usuario con los datos del perfil
         final user = UserModel(
-          id: profileData['id']?.toString() ?? '',
+          id: currentUser?.id ?? '0', // Mantenemos el ID del token JWT
           username: profileData['username'] ?? '',
           email: profileData['email'] ?? '',
           password: '',
@@ -813,7 +831,6 @@ class ApiService {
 
         // Guardar en SharedPreferences
         final prefs = await _storage;
-        await prefs.setString('user_id', user.id);
         await prefs.setString('username', user.username);
         await prefs.setString('email', user.email);
         await prefs.setInt('points', user.points);
@@ -835,33 +852,16 @@ class ApiService {
 
   // Método para actualizar el perfil del usuario
   Future<bool> updateUserProfile({
-    String? username,
-    String? email,
-    String? password,
-    String? avatar,
     String? firstName,
     String? lastName,
     String? favoriteTeam,
+    String? avatar,
+    String? newPassword,
   }) async {
     try {
-      final currentUser = await getUserProfile();
-      if (currentUser == null) {
-        return false;
-      }
+      final Map<String, dynamic> userData = {};
 
-      final userData = {
-        'username': username ?? currentUser.username,
-        'email': email ?? currentUser.email,
-      };
-
-      if (password != null && password.isNotEmpty) {
-        userData['password'] = password;
-      }
-
-      if (avatar != null) {
-        userData['avatar'] = avatar;
-      }
-
+      // Solo incluir campos que se van a actualizar (PATCH)
       if (firstName != null) {
         userData['first_name'] = firstName;
       }
@@ -874,12 +874,27 @@ class ApiService {
         userData['favorite_team'] = favoriteTeam;
       }
 
+      if (avatar != null) {
+        userData['avatar'] = avatar;
+      }
+
+      if (newPassword != null && newPassword.isNotEmpty) {
+        userData['new_password'] = newPassword;
+      }
+
       final response = await _authenticatedRequest(
         'PATCH',
         profileEndpoint,
         body: userData,
       );
-      return response != null;
+
+      if (response != null) {
+        // Recargar el perfil después de la actualización
+        await getUserProfile();
+        return true;
+      }
+
+      return false;
     } catch (e) {
       return false;
     }
@@ -937,16 +952,16 @@ class ApiService {
       {String? currentUserId}) async {
     try {
       final Map<String, dynamic> requestBody = {
-        'field_type': fieldType,
+        'field_type': fieldType, // 'username' o 'email'
         'value': value,
       };
 
       if (currentUserId != null) {
-        requestBody['current_user_id'] = currentUserId;
+        requestBody['current_user_id'] = int.parse(currentUserId);
       }
 
       final response = await http.post(
-        Uri.parse('$baseUrl/users/check-availability/'),
+        Uri.parse('$baseUrl$checkAvailabilityEndpoint'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -956,10 +971,7 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
-
-        if (data['success'] == true) {
-          return data['available'] == true;
-        }
+        return data['available'] == true;
       }
 
       // En caso de error, asumimos que está disponible para evitar bloquear al usuario
@@ -1016,19 +1028,29 @@ class ApiService {
 
       List<Race> results = [];
 
+      if (response != null && response['success'] == true) {
+        final List<dynamic> races = response['races'] as List;
+        results = races.map((raceData) => Race.fromJson(raceData)).toList();
+      }
+
+      return results;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Método para obtener carreras próximas
+  Future<List<Race>> getUpcomingRaces() async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        upcomingRacesEndpoint,
+      );
+
+      List<Race> results = [];
+
       if (response is List) {
         results = response.map((raceData) => Race.fromJson(raceData)).toList();
-      } else if (response is Map<String, dynamic>) {
-        if (response.containsKey('races') && response['races'] is List) {
-          final List<dynamic> races = response['races'];
-          results = races.map((raceData) => Race.fromJson(raceData)).toList();
-        } else if (response.containsKey('results') &&
-            response['results'] is List) {
-          final List<dynamic> responseResults = response['results'];
-          results = responseResults
-              .map((raceData) => Race.fromJson(raceData))
-              .toList();
-        }
       }
 
       return results;
@@ -1065,40 +1087,24 @@ class ApiService {
   }
 
   // Método para obtener resultados de apuestas del usuario
-  Future<List<BetResult>> getUserBetResults() async {
+  Future<List<BetResult>> getUserBetResults(
+      {int page = 1, int pageSize = 20}) async {
     try {
       final response = await _authenticatedRequest(
         'GET',
         allBetResultsEndpoint,
+        queryParams: {
+          'page': page.toString(),
+          'page_size': pageSize.toString(),
+        },
       );
 
       List<BetResult> results = [];
 
-      if (response == null) {
-        return [];
-      }
-
-      if (response is List) {
-        results =
-            response.map((betData) => BetResult.fromJson(betData)).toList();
-      } else if (response is Map<String, dynamic>) {
+      if (response != null && response is Map<String, dynamic>) {
         if (response.containsKey('bets') && response['bets'] is List) {
           final List<dynamic> bets = response['bets'];
           results = bets.map((betData) => BetResult.fromJson(betData)).toList();
-        } else if (response.containsKey('results') &&
-            response['results'] is List) {
-          final List<dynamic> responseResults = response['results'];
-          results = responseResults
-              .map((betData) => BetResult.fromJson(betData))
-              .toList();
-        } else {
-          // Intentar procesar directamente la respuesta como un BetResult
-          try {
-            final betResult = BetResult.fromJson(response);
-            results = [betResult];
-          } catch (e) {
-            // Error silencioso
-          }
         }
       }
 
@@ -1108,30 +1114,196 @@ class ApiService {
     }
   }
 
-  // Método para crear una apuesta
-  Future<Map<String, dynamic>> createBet(Map<String, dynamic> bet) async {
+  // Método para obtener información de paginación de apuestas
+  Future<Map<String, dynamic>> getUserBetResultsWithPagination(
+      {int page = 1, int pageSize = 20}) async {
     try {
+      final response = await _authenticatedRequest(
+        'GET',
+        allBetResultsEndpoint,
+        queryParams: {
+          'page': page.toString(),
+          'page_size': pageSize.toString(),
+        },
+      );
+
+      if (response != null && response is Map<String, dynamic>) {
+        final List<BetResult> bets = [];
+        if (response.containsKey('bets') && response['bets'] is List) {
+          final List<dynamic> betsData = response['bets'];
+          bets.addAll(
+              betsData.map((betData) => BetResult.fromJson(betData)).toList());
+        }
+
+        return {
+          'bets': bets,
+          'total_bets': response['total_bets'] ?? 0,
+          'page': response['page'] ?? 1,
+          'page_size': response['page_size'] ?? 20,
+          'total_pages': response['total_pages'] ?? 1,
+        };
+      }
+
+      return {
+        'bets': <BetResult>[],
+        'total_bets': 0,
+        'page': 1,
+        'page_size': 20,
+        'total_pages': 1,
+      };
+    } catch (e) {
+      return {
+        'bets': <BetResult>[],
+        'total_bets': 0,
+        'page': 1,
+        'page_size': 20,
+        'total_pages': 1,
+      };
+    }
+  }
+
+  // Método para crear una apuesta
+  Future<Map<String, dynamic>> createBet({
+    required String season,
+    required String round,
+    required String raceName,
+    required String date,
+    required String circuit,
+    required bool hasSprint,
+    required String poleman,
+    required List<String> top10,
+    required String dnf,
+    required String fastestLap,
+    List<String>? sprintTop10,
+  }) async {
+    try {
+      final betData = {
+        'season': season,
+        'round': round,
+        'race_name': raceName,
+        'date': date,
+        'circuit': circuit,
+        'has_sprint': hasSprint,
+        'poleman': poleman,
+        'top10': top10,
+        'dnf': dnf,
+        'fastest_lap': fastestLap,
+      };
+
+      if (hasSprint && sprintTop10 != null) {
+        betData['sprint_top10'] = sprintTop10;
+      } else {
+        betData['sprint_top10'] = [];
+      }
+
       final response = await _authenticatedRequest(
         'POST',
         betsEndpoint,
-        body: bet,
+        body: betData,
+      );
+
+      if (response != null && response['success'] == true) {
+        return {
+          'success': true,
+          'message': response['message'] ?? 'Apuesta creada exitosamente'
+        };
+      } else {
+        return {
+          'success': false,
+          'error': response?['error'] ?? 'No se pudo crear la apuesta'
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  // Método legacy para mantener compatibilidad
+  @Deprecated('Use createBet with named parameters instead')
+  Future<Map<String, dynamic>> createBetLegacy(Map<String, dynamic> bet) async {
+    return createBet(
+      season: bet['season']?.toString() ?? '',
+      round: bet['round']?.toString() ?? '',
+      raceName: bet['race_name'] ?? bet['raceName'] ?? '',
+      date: bet['date'] ?? '',
+      circuit: bet['circuit'] ?? '',
+      hasSprint: bet['has_sprint'] ?? bet['hasSprint'] ?? false,
+      poleman: bet['poleman'] ?? '',
+      top10: List<String>.from(bet['top10'] ?? []),
+      dnf: bet['dnf'] ?? '',
+      fastestLap: bet['fastest_lap'] ?? bet['fastestLap'] ?? '',
+      sprintTop10: bet['sprint_top10'] != null
+          ? List<String>.from(bet['sprint_top10'])
+          : null,
+    );
+  }
+
+  // Método para obtener una apuesta específica
+  Future<Map<String, dynamic>?> getBet(int betId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$betsEndpoint$betId/',
+      );
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Método para comparar resultados de una apuesta
+  Future<Map<String, dynamic>?> compareBetResults(int betId) async {
+    try {
+      final response = await _authenticatedRequest(
+        'GET',
+        '$betsEndpoint$betId/compare_results/',
+      );
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Método para actualizar resultados de carrera (Admin)
+  Future<Map<String, dynamic>> updateRaceResults({
+    required String season,
+    required String round,
+    required String realPoleman,
+    required List<String> realTop10,
+    required List<String> realDnf,
+    required String realFastestLap,
+    List<String>? realSprintTop10,
+  }) async {
+    try {
+      final resultsData = {
+        'season': season,
+        'round': round,
+        'real_poleman': realPoleman,
+        'real_top10': realTop10,
+        'real_dnf': realDnf,
+        'real_fastest_lap': realFastestLap,
+      };
+
+      if (realSprintTop10 != null) {
+        resultsData['real_sprint_top10'] = realSprintTop10;
+      } else {
+        resultsData['real_sprint_top10'] = [];
+      }
+
+      final response = await _authenticatedRequest(
+        'POST',
+        updateRaceResultsEndpoint,
+        body: resultsData,
       );
 
       if (response != null) {
-        if (response is Map<String, dynamic>) {
-          if (response.containsKey('success') && response['success'] == true) {
-            return {'success': true, 'bet': response};
-          }
-          if (response.containsKey('id')) {
-            return {'success': true, 'bet': response};
-          }
-          if (response.containsKey('error')) {
-            return {'success': false, 'error': response['error']};
-          }
-        }
-        return {'success': true, 'bet': response};
+        return {'success': true, 'data': response};
+      } else {
+        return {
+          'success': false,
+          'error': 'No se pudieron actualizar los resultados'
+        };
       }
-      return {'success': false, 'error': 'No se pudo crear la apuesta'};
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
@@ -1197,7 +1369,7 @@ class ApiService {
     try {
       final response = await _authenticatedRequest(
         'POST',
-        '$tournamentsEndpoint' + 'join/',
+        joinTournamentEndpoint,
         body: {'inviteCode': inviteCode},
       );
 
@@ -1243,9 +1415,6 @@ class ApiService {
         },
         body: jsonEncode({
           'email': email,
-          // URL correcta para GitHub Pages con el subdirectorio y formato hash
-          'frontend_url':
-              'https://jeffreydtz.github.io/f1prode-flutter-webapp/#',
         }),
       );
 

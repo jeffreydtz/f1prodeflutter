@@ -200,8 +200,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final response = await _apiService.register(
-          username, email, password, passwordConfirm,
-          avatarBase64: _avatarBase64);
+        username: username,
+        email: email,
+        password: password,
+        avatarBase64: _avatarBase64,
+      );
       setState(() => _isLoading = false);
 
       if (response['success']) {

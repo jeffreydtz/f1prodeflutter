@@ -263,19 +263,19 @@ class _BetScreenState extends State<BetScreen> {
     }
 
     try {
-      final result = await apiService.createBet({
-        'season': widget.season,
-        'round': widget.round,
-        'race_name': widget.raceName,
-        'date': widget.date,
-        'circuit': widget.circuit,
-        'has_sprint': widget.hasSprint,
-        'poleman': _selectedPoleman,
-        'top10': _top10,
-        'dnf': _selectedDnf,
-        'fastest_lap': _selectedFastestLap,
-        if (widget.hasSprint) 'sprint_top10': _sprintTop8,
-      });
+      final result = await apiService.createBet(
+        season: widget.season,
+        round: widget.round,
+        raceName: widget.raceName,
+        date: widget.date,
+        circuit: widget.circuit,
+        hasSprint: widget.hasSprint,
+        poleman: _selectedPoleman!,
+        top10: _top10,
+        dnf: _selectedDnf!,
+        fastestLap: _selectedFastestLap!,
+        sprintTop10: widget.hasSprint ? _sprintTop8 : null,
+      );
 
       if (result['success'] == true && mounted) {
         await _showDialog('Predicción confirmada con éxito.', Colors.green,

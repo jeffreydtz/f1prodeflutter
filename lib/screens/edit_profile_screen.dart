@@ -201,13 +201,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       // Actualizar el perfil usando los parámetros correctos del método
       final success = await _apiService.updateUserProfile(
-        username: _usernameController.text,
-        email: _emailController.text,
         firstName: _firstNameController.text,
         lastName: _lastNameController.text,
         favoriteTeam: _favoriteTeamController.text,
-        // avatar: _avatarBase64,
-        password: _changePassword ? _newPasswordController.text : null,
+        newPassword: _changePassword ? _newPasswordController.text : null,
       );
 
       if (mounted) {

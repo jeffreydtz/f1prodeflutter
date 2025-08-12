@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../screens/edit_profile_screen.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
+import '../widgets/f1_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -143,36 +144,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _buildBody(),
       bottomNavigationBar: isWeb
           ? null
-          : BottomAppBar(
-              shape: const CircularNotchedRectangle(),
-              color: Colors.grey[900],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/home'),
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.list_number,
-                        color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/results'),
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.person_3_fill,
-                        color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/tournaments'),
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.profile_circled,
-                        color: Colors.white),
-                    onPressed: null, // Ya estamos en perfil
-                  ),
-                ],
-              ),
+          : F1BottomNavigation(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+                switch (index) {
+                  case 0:
+                    Navigator.pushReplacementNamed(context, '/home');
+                    break;
+                  case 1:
+                    Navigator.pushReplacementNamed(context, '/results');
+                    break;
+                  case 2:
+                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    break;
+                  case 3:
+                    // Ya estamos en perfil
+                    break;
+                }
+              },
+              items: const [
+                F1BottomNavItem(
+                  icon: CupertinoIcons.home,
+                  activeIcon: CupertinoIcons.house_fill,
+                  label: 'Inicio',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.list_bullet,
+                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                  label: 'Resultados',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person_3,
+                  activeIcon: CupertinoIcons.person_3_fill,
+                  label: 'Torneos',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person,
+                  activeIcon: CupertinoIcons.person_fill,
+                  label: 'Perfil',
+                ),
+              ],
             ),
     );
   }

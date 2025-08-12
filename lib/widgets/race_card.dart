@@ -103,7 +103,7 @@ class RaceCard extends StatelessWidget {
 
           // Action button
           F1PrimaryButton(
-            text: isCompleted ? 'Ver Predicción' : 'Predecir',
+            text: isCompleted ? 'Ver tu Predicción' : 'Predecir',
             onPressed: isCompleted ? onViewResults : onPredict,
             icon: isCompleted ? Icons.visibility : Icons.sports_score,
             fullWidth: true,

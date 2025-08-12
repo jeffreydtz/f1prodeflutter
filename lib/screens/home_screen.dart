@@ -10,7 +10,6 @@ import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
 import '../theme/f1_theme.dart';
 import '../widgets/f1_widgets.dart';
-import 'dart:convert';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -238,6 +237,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return RaceCard(
       race: race,
       onPredict: () {
+        // Si ya hay apuesta, navegar a resultados en lugar de permitir otra
+        if (race.hasBet) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ResultsScreen(
+                initialRaceId: '${race.season}_${race.round}',
+              ),
+            ),
+          );
+          return;
+        }
+
         Navigator.push(
           context,
           MaterialPageRoute(

@@ -1,11 +1,11 @@
 {
-    "name": "f1prodeflutter",
-    "short_name": "f1prodeflutter",
+    "name": "F1 Prode",
+    "short_name": "F1 Prode",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FF1801",
+    "theme_color": "#FF1801",
+    "description": "Formula 1 Prediction Game - Compete with friends in F1 tournaments!",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

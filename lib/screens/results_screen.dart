@@ -3,6 +3,7 @@ import '../services/api_service.dart';
 import '../models/betresult.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
+import '../widgets/f1_widgets.dart';
 
 class ResultsScreen extends StatefulWidget {
   final String? initialRaceId;
@@ -171,7 +172,7 @@ class _ResultsScreenState extends State<ResultsScreen>
                       ],
                     ),
       bottomNavigationBar: !isWeb
-          ? BottomNavigationBar(
+          ? F1BottomNavigation(
               currentIndex: _selectedIndex,
               onTap: (index) {
                 setState(() {
@@ -192,25 +193,25 @@ class _ResultsScreenState extends State<ResultsScreen>
                     break;
                 }
               },
-              type: BottomNavigationBarType.fixed,
-              backgroundColor: const Color.fromARGB(255, 30, 30, 30),
-              selectedItemColor: const Color.fromARGB(255, 255, 17, 0),
-              unselectedItemColor: Colors.white70,
               items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home),
+                F1BottomNavItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home,
                   label: 'Inicio',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.list_alt),
+                F1BottomNavItem(
+                  icon: Icons.list_alt_outlined,
+                  activeIcon: Icons.list_alt,
                   label: 'Resultados',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.people),
+                F1BottomNavItem(
+                  icon: Icons.people_outline,
+                  activeIcon: Icons.people,
                   label: 'Torneos',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person),
+                F1BottomNavItem(
+                  icon: Icons.person_outline,
+                  activeIcon: Icons.person,
                   label: 'Perfil',
                 ),
               ],

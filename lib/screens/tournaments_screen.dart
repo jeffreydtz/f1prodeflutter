@@ -6,6 +6,7 @@ import '../widgets/tournament_card.dart';
 import 'tournament_details_screen.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
+import '../widgets/f1_widgets.dart';
 
 class TournamentsScreen extends StatefulWidget {
   const TournamentsScreen({Key? key}) : super(key: key);
@@ -288,36 +289,49 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       body: _buildBody(),
       bottomNavigationBar: isWeb
           ? null
-          : BottomAppBar(
-              shape: const CircularNotchedRectangle(),
-              color: Colors.grey[900],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.home, color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/home'),
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.list_number,
-                        color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/results'),
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.person_3_fill,
-                        color: Colors.white),
-                    onPressed: null, // Ya estamos en torneos
-                  ),
-                  IconButton(
-                    icon: const Icon(CupertinoIcons.profile_circled,
-                        color: Colors.white),
-                    onPressed: () =>
-                        Navigator.pushReplacementNamed(context, '/profile'),
-                  ),
-                ],
-              ),
+          : F1BottomNavigation(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+                switch (index) {
+                  case 0:
+                    Navigator.pushReplacementNamed(context, '/home');
+                    break;
+                  case 1:
+                    Navigator.pushReplacementNamed(context, '/results');
+                    break;
+                  case 2:
+                    // Ya estamos en torneos
+                    break;
+                  case 3:
+                    Navigator.pushReplacementNamed(context, '/profile');
+                    break;
+                }
+              },
+              items: const [
+                F1BottomNavItem(
+                  icon: CupertinoIcons.home,
+                  activeIcon: CupertinoIcons.house_fill,
+                  label: 'Inicio',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.list_bullet,
+                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                  label: 'Resultados',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person_3,
+                  activeIcon: CupertinoIcons.person_3_fill,
+                  label: 'Torneos',
+                ),
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person,
+                  activeIcon: CupertinoIcons.person_fill,
+                  label: 'Perfil',
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showTournamentActionSheet(context),
@@ -426,7 +440,7 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
     return TournamentCard(
       name: tournament.name,
       inviteCode: tournament.inviteCode,
-      participantsCount: tournament.participants?.length ?? 0,
+      participantsCount: tournament.participants.length,
       position: tournament.userPosition,
       points: tournament.userPoints,
       isCreator: tournament.isCreator,

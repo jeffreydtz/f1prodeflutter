@@ -25,15 +25,15 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="f1prodeflutter">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/Icon-192.png">
   <!-- Viewport meta tag para dispositivos móviles -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="logof1 copy.png"/>
+  <link rel="icon" type="image/png" href="./logof1 copy.png"/>
 
-  <title>f1prodeflutter</title>
-  <link rel="manifest" href="manifest.json">
+  <title>F1 Prode</title>
+  <link rel="manifest" href="./manifest.json">
   
   <!-- Estilos para asegurar que Flutter tenga un contenedor válido -->
   <style>
@@ -259,7 +259,9 @@
       
       // Cargamos el script dinámicamente
       var scriptTag = document.createElement('script');
-      scriptTag.src = "flutter.js";
+      // Para GitHub Pages, usar la ruta correcta
+      var basePath = window.location.pathname.endsWith('/') ? window.location.pathname : window.location.pathname + '/';
+      scriptTag.src = basePath + "flutter.js";
       scriptTag.type = "application/javascript";
       
       // Tiempo máximo para cargar flutter.js
@@ -281,13 +283,9 @@
         clearTimeout(flutterLoadTimeout);
         console.log('Error al cargar flutter.js. Intentando con ruta absoluta...');
         
-        // Intento con ruta absoluta
-        var basePath = window.location.origin + window.location.pathname;
-        if (!basePath.endsWith('/')) {
-          basePath += '/';
-        }
-        
-        scriptTag.src = basePath + "flutter.js";
+        // Intento con ruta absoluta (fallback)
+        console.log('Intentando cargar desde: ' + window.location.origin + window.location.pathname + 'flutter.js');
+        scriptTag.src = "./flutter.js"; // Usar ruta relativa como fallback
         console.log('Intentando cargar desde: ' + scriptTag.src);
         
         var secondAttemptTimeout = setTimeout(function() {

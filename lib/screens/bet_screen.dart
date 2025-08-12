@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../models/bet.dart';
+import 'results_screen.dart';
 
 class BetScreen extends StatefulWidget {
   final String raceName;
@@ -27,6 +27,7 @@ class BetScreen extends StatefulWidget {
 class _BetScreenState extends State<BetScreen> {
   final ApiService apiService = ApiService();
   bool _isLoading = true;
+  bool _isSubmitting = false;
   List<String> _pilotos = [];
   String _selectedPoleman = '';
   List<String> _top10 = List.filled(10, '');
@@ -37,7 +38,19 @@ class _BetScreenState extends State<BetScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchDrivers();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // Ejecutar en paralelo: pilotos + verificación de predicción
+    try {
+      await Future.wait([
+        _fetchDrivers(),
+        _checkAlreadyPredicted(),
+      ]);
+    } catch (_) {
+      // Ignorar; _fetchDrivers gestiona sus errores
+    }
   }
 
   Future<void> _fetchDrivers() async {
@@ -61,6 +74,27 @@ class _BetScreenState extends State<BetScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _checkAlreadyPredicted() async {
+    try {
+      final results = await apiService.getUserBetResults(pageSize: 500);
+      final hasBet = results.any((r) =>
+          r.season.toString() == widget.season.toString() &&
+          r.round.toString() == widget.round.toString());
+
+      if (hasBet && mounted) {
+        // Si ya tiene predicción, navegar directamente a verla
+        Future.microtask(() {
+          Navigator.of(context).pushReplacementNamed(
+            '/results',
+            arguments: null,
+          );
+        });
+      }
+    } catch (_) {
+      // En caso de error, no bloqueamos la pantalla
     }
   }
 
@@ -213,15 +247,24 @@ class _BetScreenState extends State<BetScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                onPressed: _confirmBet,
-                child: const Text(
-                  'Enviar Prediccion',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                onPressed: _isSubmitting ? null : _confirmBet,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Enviar Prediccion',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -231,6 +274,7 @@ class _BetScreenState extends State<BetScreen> {
   }
 
   Future<void> _confirmBet() async {
+    if (_isSubmitting) return;
     if (_selectedPoleman.isEmpty) {
       _showDialog('Por favor, selecciona un piloto para la pole position.',
           const Color.fromARGB(255, 255, 17, 0), Icons.close);
@@ -263,6 +307,7 @@ class _BetScreenState extends State<BetScreen> {
     }
 
     try {
+      setState(() => _isSubmitting = true);
       final result = await apiService.createBet(
         season: widget.season,
         round: widget.round,
@@ -270,10 +315,10 @@ class _BetScreenState extends State<BetScreen> {
         date: widget.date,
         circuit: widget.circuit,
         hasSprint: widget.hasSprint,
-        poleman: _selectedPoleman!,
+        poleman: _selectedPoleman,
         top10: _top10,
-        dnf: _selectedDnf!,
-        fastestLap: _selectedFastestLap!,
+        dnf: _selectedDnf,
+        fastestLap: _selectedFastestLap,
         sprintTop10: widget.hasSprint ? _sprintTop8 : null,
       );
 
@@ -281,7 +326,14 @@ class _BetScreenState extends State<BetScreen> {
         await _showDialog('Predicción confirmada con éxito.', Colors.green,
             Icons.check_circle);
         if (mounted) {
-          Navigator.of(context).pop();
+          // Después de enviar, redirigir a resultados de esa carrera
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => ResultsScreen(
+                initialRaceId: '${widget.season}_${widget.round}',
+              ),
+            ),
+          );
         }
       } else if (mounted) {
         final errorMessage =
@@ -294,6 +346,8 @@ class _BetScreenState extends State<BetScreen> {
         await _showDialog('Error al enviar la predicción: ${e.toString()}',
             const Color.fromARGB(255, 255, 17, 0), Icons.error);
       }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 

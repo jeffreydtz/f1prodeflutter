@@ -86,10 +86,12 @@ class _BetScreenState extends State<BetScreen> {
 
       if (hasBet && mounted) {
         // Si ya tiene predicción, navegar directamente a verla
+        final raceId = '${widget.season}_${widget.round}';
         Future.microtask(() {
-          Navigator.of(context).pushReplacementNamed(
-            '/results',
-            arguments: null,
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => ResultsScreen(initialRaceId: raceId),
+            ),
           );
         });
       }

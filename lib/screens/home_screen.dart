@@ -237,33 +237,62 @@ class _HomeScreenState extends State<HomeScreen> {
     return RaceCard(
       race: race,
       onPredict: () {
-        // Si ya hay apuesta, navegar a resultados en lugar de permitir otra
-        if (race.hasBet) {
+        // Doble validación: flag local y verificación al vuelo desde el backend
+        Future<void>(() async {
+          final initialRaceId = '${race.season}_${race.round}';
+          if (race.hasBet) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ResultsScreen(initialRaceId: initialRaceId),
+              ),
+            );
+            return;
+          }
+
+          try {
+            final bets = await apiService.getUserBetResults(pageSize: 500);
+            final alreadyHasBet = bets.any((b) =>
+                b.season.toString() == race.season.toString() &&
+                b.round.toString() == race.round.toString());
+            if (alreadyHasBet) {
+              // Actualizar estado local para reflejar el backend
+              setState(() {
+                races = races
+                    .map((r) =>
+                        (r.season == race.season && r.round == race.round)
+                            ? r.copyWith(hasBet: true)
+                            : r)
+                    .toList();
+              });
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ResultsScreen(initialRaceId: initialRaceId),
+                ),
+              );
+              return;
+            }
+          } catch (_) {}
+
+          // Si no hay apuesta, permitir crearla
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ResultsScreen(
-                initialRaceId: '${race.season}_${race.round}',
+              builder: (context) => BetScreen(
+                raceName: race.name,
+                date: race.date,
+                circuit: race.circuit,
+                season: race.season,
+                round: race.round,
+                hasSprint: race.hasSprint,
               ),
             ),
-          );
-          return;
-        }
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BetScreen(
-              raceName: race.name,
-              date: race.date,
-              circuit: race.circuit,
-              season: race.season,
-              round: race.round,
-              hasSprint: race.hasSprint,
-            ),
-          ),
-        ).then((_) {
-          _fetchInitialData();
+          ).then((_) {
+            _fetchInitialData();
+          });
         });
       },
       onViewResults: () {

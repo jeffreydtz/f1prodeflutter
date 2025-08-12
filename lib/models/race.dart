@@ -50,16 +50,20 @@ class Race {
   }
 
   factory Race.fromJson(Map<String, dynamic> json) {
-    // Asegurar que hasBet sea siempre un booleano
+    // Asegurar que hasBet sea siempre un booleano, soportando alias
     bool hasBet = false;
-    if (json['has_bet'] != null) {
-      // Manejar diferentes tipos de datos que podrían venir del backend
-      if (json['has_bet'] is bool) {
-        hasBet = json['has_bet'];
-      } else if (json['has_bet'] is String) {
-        hasBet = json['has_bet'].toString().toLowerCase() == 'true';
-      } else if (json['has_bet'] is num) {
-        hasBet = json['has_bet'] != 0;
+    final dynamic hasBetRaw = json['has_bet'] ??
+        json['hasBet'] ??
+        json['has_prediction'] ??
+        json['hasUserBet'] ??
+        json['user_has_bet'];
+    if (hasBetRaw != null) {
+      if (hasBetRaw is bool) {
+        hasBet = hasBetRaw;
+      } else if (hasBetRaw is String) {
+        hasBet = hasBetRaw.toLowerCase() == 'true' || hasBetRaw == '1';
+      } else if (hasBetRaw is num) {
+        hasBet = hasBetRaw != 0;
       }
     }
 
@@ -71,8 +75,8 @@ class Race {
       time: json['time'],
       circuit: json['circuit'] ?? 'N/A',
       location: json['location'],
-      hasSprint: json['has_sprint'] ?? false,
-      completed: json['completed'] ?? false,
+      hasSprint: json['has_sprint'] ?? json['hasSprint'] ?? false,
+      completed: json['completed'] ?? json['is_complete'] ?? false,
       hasBet: hasBet,
     );
   }

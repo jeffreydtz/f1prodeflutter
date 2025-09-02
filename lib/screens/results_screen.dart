@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../services/api_service.dart';
 import '../models/betresult.dart';
 import '../widgets/responsive_layout.dart';
@@ -193,25 +194,25 @@ class _ResultsScreenState extends State<ResultsScreen>
                     break;
                 }
               },
-              items: const [
-                F1BottomNavItem(
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home,
+              items: [
+                const F1BottomNavItem(
+                  icon: CupertinoIcons.home,
+                  activeIcon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
-                F1BottomNavItem(
-                  icon: Icons.list_alt_outlined,
-                  activeIcon: Icons.list_alt,
+                const F1BottomNavItem(
+                  icon: CupertinoIcons.list_bullet,
+                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
-                F1BottomNavItem(
-                  icon: Icons.people_outline,
-                  activeIcon: Icons.people,
+                const F1BottomNavItem(
+                  icon: CupertinoIcons.person_3,
+                  activeIcon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
-                F1BottomNavItem(
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
+                const F1BottomNavItem(
+                  icon: CupertinoIcons.person,
+                  activeIcon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],

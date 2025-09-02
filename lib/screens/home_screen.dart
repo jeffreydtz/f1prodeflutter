@@ -41,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      debugPrint('[Home] Fetching initial data');
       await Future.wait([
         _fetchRaces(),
         _fetchBetResults(),
@@ -85,6 +86,11 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           races = fetchedRaces;
         });
+        debugPrint('[Home] Races loaded: ${races.length}');
+        if (races.isNotEmpty) {
+          debugPrint(
+              '[Home] First race: ${races.first.name} hasBet=${races.first.hasBet}');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -103,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           betResults = results;
         });
+        debugPrint('[Home] User bet results loaded: ${betResults.length}');
       }
     } catch (e) {
       if (mounted) {
@@ -119,6 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
     bool result = betResults.any((bet) =>
         bet.season.toString() == season.toString() &&
         bet.round.toString() == round.toString());
+    debugPrint('[Home] Check bet season=$season round=$round -> $result');
     return result;
   }
 
@@ -198,13 +206,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   label: 'Resultados',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.group,
-                  activeIcon: CupertinoIcons.group_solid,
+                  icon: CupertinoIcons.person_3,
+                  activeIcon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person_circle,
-                  activeIcon: CupertinoIcons.person_circle_fill,
+                  icon: CupertinoIcons.person,
+                  activeIcon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],

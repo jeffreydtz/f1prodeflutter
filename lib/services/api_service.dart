@@ -4,11 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:flutter/foundation.dart';
+import '../utils/logger.dart';
 
 import '../models/betresult.dart';
 import '../models/user.dart';
 import '../models/race.dart';
-import '../models/bet.dart';
 import '../models/tournament.dart';
 import '../models/sanction.dart';
 
@@ -169,7 +169,6 @@ class ApiService {
             id: userId,
             username: username,
             email: '',
-            password: '',
             points: 0,
           );
 
@@ -189,7 +188,6 @@ class ApiService {
                 id: userId,
                 username: profileData['username'],
                 email: profileData['email'] ?? '',
-                password: '',
                 points: profileData['points'] ?? 0,
                 avatar: profileData['avatar'],
               );
@@ -371,7 +369,6 @@ class ApiService {
             id: userId,
             username: username,
             email: email ?? '',
-            password: '',
             points: points,
             avatar: avatar,
           );
@@ -573,6 +570,50 @@ class ApiService {
         }
       }
 
+      // Procesar redirecciones 3xx (algunos hostings devuelven 301/302/307/308)
+      if ((response.statusCode == 301 ||
+              response.statusCode == 302 ||
+              response.statusCode == 307 ||
+              response.statusCode == 308) &&
+          response.headers['location'] != null &&
+          retryCount < 1) {
+        final location = response.headers['location']!;
+        final Uri redirected = location.startsWith('http')
+            ? Uri.parse(location)
+            : Uri.parse('$baseUrl$location');
+
+        // Reintentar contra la URL redirigida
+        switch (method.toUpperCase()) {
+          case 'GET':
+            response = await http.get(redirected, headers: headers);
+            break;
+          case 'POST':
+            response = await http.post(
+              redirected,
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            );
+            break;
+          case 'PUT':
+            response = await http.put(
+              redirected,
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            );
+            break;
+          case 'PATCH':
+            response = await http.patch(
+              redirected,
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            );
+            break;
+          case 'DELETE':
+            response = await http.delete(redirected, headers: headers);
+            break;
+        }
+      }
+
       // Procesar la respuesta según el código de estado
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // Intentar decodificar como JSON
@@ -697,7 +738,6 @@ class ApiService {
             id: safeProfileData['id'],
             username: safeProfileData['username'],
             email: safeProfileData['email'],
-            password: '',
             points: safeProfileData['points'],
             avatar: safeProfileData['avatar'],
           );
@@ -732,7 +772,6 @@ class ApiService {
           id: cachedData['id'],
           username: cachedData['username'],
           email: cachedData['email'],
-          password: '',
           points: cachedData['points'],
           avatar: cachedData['avatar'],
         );
@@ -769,7 +808,6 @@ class ApiService {
           id: userId,
           username: username,
           email: email ?? '',
-          password: '',
           points: points,
           avatar: avatar,
         );
@@ -818,7 +856,6 @@ class ApiService {
           id: currentUser?.id ?? '0', // Mantenemos el ID del token JWT
           username: profileData['username'] ?? '',
           email: profileData['email'] ?? '',
-          password: '',
           points: profileData['points'] ?? 0,
           avatar: profileData['avatar'],
           firstName: profileData['first_name'],
@@ -917,12 +954,11 @@ class ApiService {
       // Intentar cargar el perfil de forma asíncrona si no está disponible
       _loadUserProfile().then((profile) {
         // Actualizar currentUser con datos recién cargados
-        if (currentUser == null && profile != null) {
+        if (currentUser == null) {
           currentUser = UserModel(
             id: profile['id'],
             username: profile['username'],
             email: profile['email'] ?? '',
-            password: '',
             points: profile['points'],
             avatar: profile['avatar'],
           );
@@ -1021,6 +1057,8 @@ class ApiService {
   // Método para obtener todas las carreras
   Future<List<Race>> getRaces() async {
     try {
+      Logger.info(
+          '[ApiService.getRaces] Fetching races from $baseUrl$racesEndpoint');
       final response = await _authenticatedRequest(
         'GET',
         racesEndpoint,
@@ -1028,13 +1066,42 @@ class ApiService {
 
       List<Race> results = [];
 
-      if (response != null && response['success'] == true) {
-        final List<dynamic> races = response['races'] as List;
-        results = races.map((raceData) => Race.fromJson(raceData)).toList();
+      if (response == null) {
+        Logger.warning('[ApiService.getRaces] Null response');
+        return results;
       }
 
+      // La API puede devolver { success, races: [...] } o directamente una lista
+      if (response is Map<String, dynamic>) {
+        Logger.info('[ApiService.getRaces] Map response keys: ' +
+            response.keys.join(', '));
+        if (response['races'] is List) {
+          final List<dynamic> races = response['races'];
+          Logger.info('[ApiService.getRaces] races count: ${races.length}');
+          results = races.map((raceData) => Race.fromJson(raceData)).toList();
+        } else if (response['results'] is List) {
+          final List<dynamic> races = response['results'];
+          Logger.info('[ApiService.getRaces] results count: ${races.length}');
+          results = races.map((raceData) => Race.fromJson(raceData)).toList();
+        } else if (response is List) {
+          results = (response as List)
+              .map((raceData) => Race.fromJson(raceData))
+              .toList();
+        }
+      } else if (response is List) {
+        Logger.info(
+            '[ApiService.getRaces] List response length: ${response.length}');
+        results = response.map((raceData) => Race.fromJson(raceData)).toList();
+      }
+
+      if (results.isNotEmpty) {
+        final sample = results.first;
+        Logger.info(
+            '[ApiService.getRaces] Sample race: ${sample.name} | hasBet=${sample.hasBet} | season=${sample.season} round=${sample.round}');
+      }
       return results;
     } catch (e) {
+      Logger.error('[ApiService.getRaces] Error: ${e.toString()}');
       return [];
     }
   }
@@ -1042,6 +1109,7 @@ class ApiService {
   // Método para obtener carreras próximas
   Future<List<Race>> getUpcomingRaces() async {
     try {
+      Logger.info('[ApiService.getUpcomingRaces] Fetching upcoming races');
       final response = await _authenticatedRequest(
         'GET',
         upcomingRacesEndpoint,
@@ -1051,10 +1119,23 @@ class ApiService {
 
       if (response is List) {
         results = response.map((raceData) => Race.fromJson(raceData)).toList();
+      } else if (response is Map<String, dynamic>) {
+        if (response['races'] is List) {
+          final List<dynamic> races = response['races'];
+          Logger.info(
+              '[ApiService.getUpcomingRaces] races count: ${races.length}');
+          results = races.map((raceData) => Race.fromJson(raceData)).toList();
+        } else if (response['results'] is List) {
+          final List<dynamic> races = response['results'];
+          Logger.info(
+              '[ApiService.getUpcomingRaces] results count: ${races.length}');
+          results = races.map((raceData) => Race.fromJson(raceData)).toList();
+        }
       }
 
       return results;
     } catch (e) {
+      Logger.error('[ApiService.getUpcomingRaces] Error: ${e.toString()}');
       return [];
     }
   }
@@ -1062,6 +1143,7 @@ class ApiService {
   // Método para obtener conductores/pilotos
   Future<List<String>> getDrivers() async {
     try {
+      Logger.info('[ApiService.getDrivers] Fetching drivers');
       final response = await _authenticatedRequest(
         'GET',
         driversEndpoint,
@@ -1082,6 +1164,7 @@ class ApiService {
 
       return [];
     } catch (e) {
+      Logger.error('[ApiService.getDrivers] Error: ${e.toString()}');
       return [];
     }
   }
@@ -1090,6 +1173,8 @@ class ApiService {
   Future<List<BetResult>> getUserBetResults(
       {int page = 1, int pageSize = 20}) async {
     try {
+      Logger.info(
+          '[ApiService.getUserBetResults] Fetching bets page=$page size=$pageSize');
       final response = await _authenticatedRequest(
         'GET',
         allBetResultsEndpoint,
@@ -1108,8 +1193,11 @@ class ApiService {
         }
       }
 
+      Logger.info(
+          '[ApiService.getUserBetResults] Bets returned: ${results.length}');
       return results;
     } catch (e) {
+      Logger.error('[ApiService.getUserBetResults] Error: ${e.toString()}');
       return [];
     }
   }

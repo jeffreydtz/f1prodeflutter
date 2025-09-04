@@ -181,38 +181,34 @@ class _ResultsScreenState extends State<ResultsScreen>
                 });
                 switch (index) {
                   case 0:
-                    Navigator.pushReplacementNamed(context, '/home');
+                    Navigator.pushNamed(context, '/home');
                     break;
                   case 1:
-                    Navigator.pushReplacementNamed(context, '/results');
+                    // Ya estamos en results, no hacer nada
                     break;
                   case 2:
-                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    Navigator.pushNamed(context, '/tournaments');
                     break;
                   case 3:
-                    Navigator.pushReplacementNamed(context, '/profile');
+                    Navigator.pushNamed(context, '/profile');
                     break;
                 }
               },
-              items: [
-                const F1BottomNavItem(
-                  icon: CupertinoIcons.home,
-                  activeIcon: CupertinoIcons.house_fill,
+              items: const [
+                F1BottomNavItem(
+                  icon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
-                const F1BottomNavItem(
-                  icon: CupertinoIcons.list_bullet,
-                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                F1BottomNavItem(
+                  icon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
-                const F1BottomNavItem(
-                  icon: CupertinoIcons.person_3,
-                  activeIcon: CupertinoIcons.person_3_fill,
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
-                const F1BottomNavItem(
-                  icon: CupertinoIcons.person,
-                  activeIcon: CupertinoIcons.person_fill,
+                F1BottomNavItem(
+                  icon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],

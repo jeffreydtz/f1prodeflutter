@@ -235,6 +235,8 @@ class ApiService {
       try {
         final prefs = await _storage;
         _accessToken = prefs.getString('access_token');
+        debugPrint(
+            '[ApiService] Token from storage: ${_accessToken != null ? 'Found' : 'Not found'}');
 
         // Verificar si el token está por expirar
         if (_accessToken != null) {
@@ -243,21 +245,30 @@ class ApiService {
             final expiration =
                 DateTime.fromMillisecondsSinceEpoch(decodedToken['exp'] * 1000);
             final now = DateTime.now();
+            final minutesUntilExpiry = expiration.difference(now).inMinutes;
+            debugPrint(
+                '[ApiService] Token expires in $minutesUntilExpiry minutes');
 
             // Si el token expira en menos de 5 minutos, refrescarlo
-            if (expiration.difference(now).inMinutes < 5) {
+            if (minutesUntilExpiry < 5) {
+              debugPrint(
+                  '[ApiService] Token expires soon, attempting refresh...');
               await _refreshAccessTokenFromServer();
             }
           } catch (e) {
+            debugPrint('[ApiService] Error decoding token: $e');
             // Si hay un error al decodificar, intentar refrescar de todas formas
             await _refreshAccessTokenFromServer();
           }
         }
       } catch (e) {
+        debugPrint('[ApiService] Error accessing SharedPreferences: $e');
         // Error accediendo a SharedPreferences, puede ocurrir en web móvil
         // Intentar retornar el token en memoria si existe
       }
     }
+    debugPrint(
+        '[ApiService] Final token status: ${_accessToken != null ? 'Available' : 'Null'}');
     return _accessToken;
   }
 
@@ -486,7 +497,10 @@ class ApiService {
     // Verificar si hay token de acceso
     final accessToken = await _getAccessToken();
     if (accessToken == null) {
-      throw Exception('No hay token de acceso disponible');
+      debugPrint(
+          '[ApiService] No access token available for endpoint: $endpoint');
+      throw Exception(
+          'No hay token de acceso disponible. Por favor, inicia sesión nuevamente.');
     }
 
     // Obtener headers con token
@@ -650,8 +664,12 @@ class ApiService {
               throw Exception(
                   'Recurso no encontrado (404). La URL solicitada no existe en el servidor.');
             } else {
+              debugPrint(
+                  '[ApiService] HTML response received for $endpoint. Status: ${response.statusCode}');
+              debugPrint(
+                  '[ApiService] Response body: ${responseBody.substring(0, 200)}...');
               throw Exception(
-                  'El servidor devolvió una página HTML en lugar de JSON. Código de estado: ${response.statusCode}');
+                  'Error de autenticación o servidor. Por favor, inicia sesión nuevamente.');
             }
           }
 
@@ -1186,15 +1204,49 @@ class ApiService {
 
       List<BetResult> results = [];
 
-      if (response != null && response is Map<String, dynamic>) {
-        if (response.containsKey('bets') && response['bets'] is List) {
-          final List<dynamic> bets = response['bets'];
-          results = bets.map((betData) => BetResult.fromJson(betData)).toList();
+      if (response != null) {
+        if (response is List) {
+          // Si la respuesta es directamente una lista
+          Logger.info(
+              '[ApiService.getUserBetResults] Response is a list with ${response.length} items');
+          results =
+              response.map((betData) => BetResult.fromJson(betData)).toList();
+        } else if (response is Map<String, dynamic>) {
+          // Si la respuesta es un objeto con múltiples estructuras posibles
+          if (response.containsKey('bets') && response['bets'] is List) {
+            final List<dynamic> bets = response['bets'];
+            Logger.info(
+                '[ApiService.getUserBetResults] Found bets array with ${bets.length} items');
+            results =
+                bets.map((betData) => BetResult.fromJson(betData)).toList();
+          } else if (response.containsKey('results') &&
+              response['results'] is List) {
+            final List<dynamic> bets = response['results'];
+            Logger.info(
+                '[ApiService.getUserBetResults] Found results array with ${bets.length} items');
+            results =
+                bets.map((betData) => BetResult.fromJson(betData)).toList();
+          } else if (response.containsKey('data') && response['data'] is List) {
+            final List<dynamic> bets = response['data'];
+            Logger.info(
+                '[ApiService.getUserBetResults] Found data array with ${bets.length} items');
+            results =
+                bets.map((betData) => BetResult.fromJson(betData)).toList();
+          } else {
+            // Si no hay estructura conocida, intentar procesar directamente
+            Logger.warning(
+                '[ApiService.getUserBetResults] Unknown response structure: ${response.keys}');
+          }
         }
       }
 
       Logger.info(
           '[ApiService.getUserBetResults] Bets returned: ${results.length}');
+      if (results.isNotEmpty) {
+        final sample = results.first;
+        Logger.info(
+            '[ApiService.getUserBetResults] Sample bet: season=${sample.season} round=${sample.round} race=${sample.raceName}');
+      }
       return results;
     } catch (e) {
       Logger.error('[ApiService.getUserBetResults] Error: ${e.toString()}');
@@ -1336,6 +1388,54 @@ class ApiService {
       return response;
     } catch (e) {
       return null;
+    }
+  }
+
+  // Método para verificar si existe una apuesta para una temporada y ronda específica
+  Future<bool> hasBetForRace(String season, String round) async {
+    try {
+      Logger.info(
+          '[ApiService.hasBetForRace] Checking bet for season=$season round=$round');
+      final response = await _authenticatedRequest(
+        'GET',
+        betsEndpoint,
+        queryParams: {
+          'season': season,
+          'round': round,
+        },
+      );
+
+      if (response != null) {
+        if (response is List) {
+          Logger.info(
+              '[ApiService.hasBetForRace] Response is list with ${response.length} items');
+          return response.isNotEmpty;
+        } else if (response is Map<String, dynamic>) {
+          if (response.containsKey('bets') && response['bets'] is List) {
+            final List<dynamic> bets = response['bets'];
+            Logger.info('[ApiService.hasBetForRace] Found ${bets.length} bets');
+            return bets.isNotEmpty;
+          } else if (response.containsKey('results') &&
+              response['results'] is List) {
+            final List<dynamic> results = response['results'];
+            Logger.info(
+                '[ApiService.hasBetForRace] Found ${results.length} results');
+            return results.isNotEmpty;
+          } else if (response.containsKey('exists')) {
+            final exists = response['exists'] as bool? ?? false;
+            Logger.info(
+                '[ApiService.hasBetForRace] Direct exists field: $exists');
+            return exists;
+          }
+        }
+      }
+
+      Logger.info(
+          '[ApiService.hasBetForRace] No bet found for season=$season round=$round');
+      return false;
+    } catch (e) {
+      Logger.error('[ApiService.hasBetForRace] Error: ${e.toString()}');
+      return false;
     }
   }
 

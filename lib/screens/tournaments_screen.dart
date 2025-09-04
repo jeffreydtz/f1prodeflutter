@@ -35,22 +35,26 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
   Future<void> _fetchTournaments() async {
     try {
       final data = await apiService.getTournaments();
-      setState(() {
-        tournaments = data
-          ..sort((a, b) => b.userPoints.compareTo(a.userPoints));
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          tournaments = data
+            ..sort((a, b) => b.userPoints.compareTo(a.userPoints));
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        error = e.toString();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error al cargar los torneos'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          error = e.toString();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al cargar los torneos'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -73,9 +77,11 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
         final tournamentData = response['tournament'];
         final newTournament = Tournament.fromJson(tournamentData);
 
-        setState(() {
-          tournaments.add(newTournament);
-        });
+        if (mounted) {
+          setState(() {
+            tournaments.add(newTournament);
+          });
+        }
         _tournamentNameController.clear();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -297,38 +303,34 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
                 });
                 switch (index) {
                   case 0:
-                    Navigator.pushReplacementNamed(context, '/home');
+                    Navigator.pushNamed(context, '/home');
                     break;
                   case 1:
-                    Navigator.pushReplacementNamed(context, '/results');
+                    Navigator.pushNamed(context, '/results');
                     break;
                   case 2:
                     // Ya estamos en torneos
                     break;
                   case 3:
-                    Navigator.pushReplacementNamed(context, '/profile');
+                    Navigator.pushNamed(context, '/profile');
                     break;
                 }
               },
               items: const [
                 F1BottomNavItem(
-                  icon: CupertinoIcons.home,
-                  activeIcon: CupertinoIcons.house_fill,
+                  icon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.list_bullet,
-                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                  icon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person_3,
-                  activeIcon: CupertinoIcons.person_3_fill,
+                  icon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person,
-                  activeIcon: CupertinoIcons.person_fill,
+                  icon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],

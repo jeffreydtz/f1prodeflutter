@@ -8,12 +8,10 @@ import 'theme/f1_theme.dart';
 // Importaciones web condicionales
 import 'web_imports.dart'
     if (dart.library.html) 'package:flutter_web_plugins/flutter_web_plugins.dart';
-import 'screens/home_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/bet_screen.dart';
-import 'screens/tournaments_screen.dart';
-import 'screens/results_screen.dart';
+import 'screens/main_navigation_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/create_tournament_screen.dart';
 import 'screens/join_tournament_screen.dart';
@@ -100,11 +98,11 @@ class _MyAppState extends State<MyApp> {
         },
       ),
       routes: {
-        '/home': (context) => const HomeScreen(),
-        '/profile': (context) => const ProfileScreen(),
+        '/home': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/profile': (context) => const MainNavigationScreen(initialIndex: 3),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/tournaments': (context) => const TournamentsScreen(),
+        '/tournaments': (context) => const MainNavigationScreen(initialIndex: 2),
         '/bet': (context) => BetScreen(
               raceName: '',
               date: '',
@@ -113,7 +111,7 @@ class _MyAppState extends State<MyApp> {
               round: '',
               hasSprint: false,
             ),
-        '/results': (context) => const ResultsScreen(),
+        '/results': (context) => const MainNavigationScreen(initialIndex: 1),
         '/forgot-password': (context) => const ForgotPasswordScreen(),
         '/create-tournament': (context) => const CreateTournamentScreen(),
         '/join-tournament': (context) => const JoinTournamentScreen(),

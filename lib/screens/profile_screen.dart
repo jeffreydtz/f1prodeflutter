@@ -152,13 +152,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 });
                 switch (index) {
                   case 0:
-                    Navigator.pushReplacementNamed(context, '/home');
+                    Navigator.pushNamed(context, '/home');
                     break;
                   case 1:
-                    Navigator.pushReplacementNamed(context, '/results');
+                    Navigator.pushNamed(context, '/results');
                     break;
                   case 2:
-                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    Navigator.pushNamed(context, '/tournaments');
                     break;
                   case 3:
                     // Ya estamos en perfil
@@ -167,23 +167,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               items: const [
                 F1BottomNavItem(
-                  icon: CupertinoIcons.home,
-                  activeIcon: CupertinoIcons.house_fill,
+                  icon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.list_bullet,
-                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                  icon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person_3,
-                  activeIcon: CupertinoIcons.person_3_fill,
+                  icon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person,
-                  activeIcon: CupertinoIcons.person_fill,
+                  icon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],

@@ -19,14 +19,15 @@ class RaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final raceDate = DateTime.parse(race.date);
-    final isCompleted = race.hasBet;
+    final hasBet = race.hasBet;
     final now = DateTime.now();
     final isUpcoming = raceDate.isAfter(now);
+    final isRaceCompleted = race.completed;
 
     return F1RaceCard(
-      onTap: isCompleted ? onViewResults : onPredict,
-      accentColor: isCompleted ? F1Theme.successGreen : F1Theme.f1Red,
-      showCheckeredFlag: isCompleted,
+      onTap: hasBet ? onViewResults : onPredict,
+      accentColor: hasBet ? F1Theme.successGreen : (isRaceCompleted ? F1Theme.textGrey : F1Theme.f1Red),
+      showCheckeredFlag: hasBet,
       margin: const EdgeInsets.symmetric(
           horizontal: F1Theme.s, vertical: F1Theme.xs),
       child: Column(
@@ -103,9 +104,9 @@ class RaceCard extends StatelessWidget {
 
           // Action button
           F1PrimaryButton(
-            text: isCompleted ? 'Ver tu Predicción' : 'Predecir',
-            onPressed: isCompleted ? onViewResults : onPredict,
-            icon: isCompleted ? Icons.visibility : Icons.sports_score,
+            text: hasBet ? 'Ver tu Predicción' : (isRaceCompleted ? 'Carrera Terminada' : 'Predecir'),
+            onPressed: hasBet ? onViewResults : (isRaceCompleted ? null : onPredict),
+            icon: hasBet ? Icons.visibility : (isRaceCompleted ? Icons.flag : Icons.sports_score),
             fullWidth: true,
           ),
         ],

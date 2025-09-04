@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   final ApiService apiService;
@@ -28,20 +26,33 @@ class _SplashScreenState extends State<SplashScreen> {
     try {
       // Intentar obtener el token almacenado
       final token = await widget.apiService.getStoredAccessToken();
+      debugPrint('[SplashScreen] Stored token exists: ${token != null}');
 
       if (mounted) {
         widget.onInitialized(true);
 
         if (token != null) {
-          // Si hay token, inicializar la app en segundo plano y redirigir al home
-          widget.apiService.initializeApp(); // No esperamos a que termine
-          Navigator.of(context).pushReplacementNamed('/home');
+          debugPrint('[SplashScreen] Token found, initializing app...');
+          // Si hay token, inicializar la app y esperar a que termine antes de redirigir
+          final initSuccess = await widget.apiService.initializeApp();
+          debugPrint('[SplashScreen] App initialization success: $initSuccess');
+          
+          if (initSuccess) {
+            debugPrint('[SplashScreen] Navigating to /home');
+            Navigator.of(context).pushReplacementNamed('/home');
+          } else {
+            // Si la inicialización falla, redirigir al login
+            debugPrint('[SplashScreen] Initialization failed, navigating to /login');
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
         } else {
           // Si no hay token, redirigir al login
+          debugPrint('[SplashScreen] No token found, navigating to /login');
           Navigator.of(context).pushReplacementNamed('/login');
         }
       }
     } catch (e) {
+      debugPrint('[SplashScreen] Error during auth check: $e');
       if (mounted) {
         widget.onInitialized(false);
         // En caso de error, redirigir al login

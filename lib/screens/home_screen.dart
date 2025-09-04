@@ -33,7 +33,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchInitialData();
   }
 
+  @override
+  void dispose() {
+    // Cancel any ongoing operations or timers here if needed
+    super.dispose();
+  }
+
   Future<void> _fetchInitialData() async {
+    if (!mounted) return;
+    
     setState(() {
       _loading = true;
       _hasError = false;
@@ -48,34 +56,57 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
 
       // Una vez que tenemos tanto las carreras como las predicciones, cruzamos los datos
-      _updateRacesWithBetInfo();
+      await _updateRacesWithBetInfo();
 
-      setState(() {
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _loading = false;
-        _hasError = true;
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _hasError = true;
+          _errorMessage = e.toString();
+        });
+      }
     }
   }
 
-  // Método para actualizar las carreras con la información de predicciones
-  void _updateRacesWithBetInfo() {
+  // Método optimizado para actualizar las carreras con la información de predicciones
+  Future<void> _updateRacesWithBetInfo() async {
+    if (!mounted) return;
+    
+    debugPrint('[Home] Updating races with bet info');
+    debugPrint('[Home] BetResults count: ${betResults.length}');
+    
+    // Crear un Set para búsqueda rápida de apuestas existentes
+    final Set<String> existingBets = betResults.map((bet) => '${bet.season}_${bet.round}').toSet();
+    
+    // Crear una nueva lista de carreras con la información de apuestas actualizada
+    List<Race> updatedRaces = [];
+    
+    for (Race race in races) {
+      // Verificación local rápida usando Set.contains (O(1))
+      final raceKey = '${race.season}_${race.round}';
+      bool hasBet = existingBets.contains(raceKey);
+      debugPrint('[Home] Race ${race.name} (${race.season}-${race.round}): has bet = $hasBet');
+      
+      // Crear race actualizada si es necesario
+      if (race.hasBet != hasBet) {
+        debugPrint('[Home] Updating race ${race.name}: hasBet ${race.hasBet} -> $hasBet');
+        updatedRaces.add(race.copyWith(hasBet: hasBet));
+      } else {
+        updatedRaces.add(race);
+      }
+    }
+    
     if (mounted) {
       setState(() {
-        // Para cada carrera, verificamos si existe una predicción
-        races = races.map((race) {
-          bool hasBet = _checkExistingPrediction(race.season, race.round);
-          // Solo actualizamos hasBet si es necesario
-          if (race.hasBet != hasBet) {
-            return race.copyWith(hasBet: hasBet);
-          }
-          return race;
-        }).toList();
+        races = updatedRaces;
       });
+      debugPrint('[Home] Races updated. Bets found: ${updatedRaces.where((r) => r.hasBet).length}');
     }
   }
 
@@ -121,13 +152,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool _checkExistingPrediction(String season, String round) {
-    // Aquí el problema puede ser el tipo de datos. Asegurémonos de comparar strings
-    bool result = betResults.any((bet) =>
-        bet.season.toString() == season.toString() &&
-        bet.round.toString() == round.toString());
-    debugPrint('[Home] Check bet season=$season round=$round -> $result');
-    return result;
+
+  // Método para forzar la actualización del estado de apuestas
+  Future<void> forceUpdateBetStatus() async {
+    if (!mounted) return;
+    
+    debugPrint('[Home] Force updating bet status');
+    await _fetchBetResults();
+    await _updateRacesWithBetInfo();
   }
 
   @override
@@ -151,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.refresh_rounded),
                   onPressed: _fetchInitialData,
                   style: IconButton.styleFrom(
-                    backgroundColor: F1Theme.f1Red.withOpacity(0.1),
+                    backgroundColor: F1Theme.f1Red.withValues(alpha: 0.1),
                     foregroundColor: F1Theme.f1Red,
                   ),
                 ),
@@ -161,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _loading
           ? Center(
               child: F1LoadingIndicator(
-                message: 'Cargando carreras...',
+                message: 'Cargando temporada 2025...',
               ),
             )
           : _hasError
@@ -181,38 +213,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 switch (index) {
                   case 0:
-                    Navigator.pushReplacementNamed(context, '/home');
+                    // Ya estamos en home, no hacer nada
                     break;
                   case 1:
-                    Navigator.pushReplacementNamed(context, '/results');
+                    Navigator.pushNamed(context, '/results');
                     break;
                   case 2:
-                    Navigator.pushReplacementNamed(context, '/tournaments');
+                    Navigator.pushNamed(context, '/tournaments');
                     break;
                   case 3:
-                    Navigator.pushReplacementNamed(context, '/profile');
+                    Navigator.pushNamed(context, '/profile');
                     break;
                 }
               },
               items: const [
                 F1BottomNavItem(
-                  icon: CupertinoIcons.home,
-                  activeIcon: CupertinoIcons.house_fill,
+                  icon: CupertinoIcons.house_fill,
                   label: 'Inicio',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.list_bullet,
-                  activeIcon: CupertinoIcons.list_bullet_below_rectangle,
+                  icon: CupertinoIcons.list_bullet_below_rectangle,
                   label: 'Resultados',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person_3,
-                  activeIcon: CupertinoIcons.person_3_fill,
+                  icon: CupertinoIcons.person_3_fill,
                   label: 'Torneos',
                 ),
                 F1BottomNavItem(
-                  icon: CupertinoIcons.person,
-                  activeIcon: CupertinoIcons.person_fill,
+                  icon: CupertinoIcons.person_fill,
                   label: 'Perfil',
                 ),
               ],
@@ -248,7 +276,36 @@ class _HomeScreenState extends State<HomeScreen> {
         // Doble validación: flag local y verificación al vuelo desde el backend
         Future<void>(() async {
           final initialRaceId = '${race.season}_${race.round}';
+          
+          // Primera verificación: estado local
           if (race.hasBet) {
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      ResultsScreen(initialRaceId: initialRaceId),
+                ),
+              );
+            }
+            return;
+          }
+
+          // Segunda verificación: verificar localmente en betResults cargados
+          final alreadyHasBet = betResults.any((b) =>
+              b.season.toString() == race.season.toString() &&
+              b.round.toString() == race.round.toString());
+          
+          if (alreadyHasBet && mounted) {
+            // Actualizar estado local para reflejar los datos
+            setState(() {
+              races = races
+                  .map((r) =>
+                      (r.season == race.season && r.round == race.round)
+                          ? r.copyWith(hasBet: true)
+                          : r)
+                  .toList();
+            });
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -259,48 +316,27 @@ class _HomeScreenState extends State<HomeScreen> {
             return;
           }
 
-          try {
-            final bets = await apiService.getUserBetResults(pageSize: 500);
-            final alreadyHasBet = bets.any((b) =>
-                b.season.toString() == race.season.toString() &&
-                b.round.toString() == race.round.toString());
-            if (alreadyHasBet) {
-              // Actualizar estado local para reflejar el backend
-              setState(() {
-                races = races
-                    .map((r) =>
-                        (r.season == race.season && r.round == race.round)
-                            ? r.copyWith(hasBet: true)
-                            : r)
-                    .toList();
-              });
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ResultsScreen(initialRaceId: initialRaceId),
-                ),
-              );
-              return;
-            }
-          } catch (_) {}
-
           // Si no hay apuesta, permitir crearla
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BetScreen(
-                raceName: race.name,
-                date: race.date,
-                circuit: race.circuit,
-                season: race.season,
-                round: race.round,
-                hasSprint: race.hasSprint,
+          if (mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BetScreen(
+                  raceName: race.name,
+                  date: race.date,
+                  circuit: race.circuit,
+                  season: race.season,
+                  round: race.round,
+                  hasSprint: race.hasSprint,
+                ),
               ),
-            ),
-          ).then((_) {
-            _fetchInitialData();
-          });
+            ).then((_) {
+              if (mounted) {
+                // Forzar actualización completa para sincronizar el estado
+                forceUpdateBetStatus();
+              }
+            });
+          }
         });
       },
       onViewResults: () {

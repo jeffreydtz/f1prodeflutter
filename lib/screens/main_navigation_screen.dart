@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
 import '../widgets/f1_widgets.dart';
+import '../layouts/web_app_layout.dart';
+import '../widgets/web_dashboard_widgets.dart';
 import '../theme/f1_theme.dart';
 import '../services/api_service.dart';
 import '../models/race.dart';
@@ -251,30 +253,45 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     final isWeb = ResponsiveLayout.isWeb(context);
 
+    if (isWeb) {
+      // Layout web moderno con sidebar
+      return WebAppLayout(
+        title: _getTitle(),
+        currentIndex: _currentIndex,
+        onNavigationChanged: (index) {
+          _onNavTap(index);
+        },
+        onRefresh: _refreshCurrentScreen,
+        child: PageView(
+          controller: _pageController,
+          onPageChanged: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          children: _screens,
+        ),
+      );
+    }
+
+    // Layout móvil tradicional
     return Scaffold(
-      appBar: isWeb
-          ? WebNavbar(
-              title: _getTitle(),
-              currentIndex: _currentIndex,
-              onRefresh: _refreshCurrentScreen,
-              showBackButton: false,
-            )
-          : AppBar(
-              title: Text(_getTitle()),
-              backgroundColor: F1Theme.carbonBlack,
-              automaticallyImplyLeading: false, // No mostrar botón back
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  onPressed: _refreshCurrentScreen,
-                  style: IconButton.styleFrom(
-                    backgroundColor: F1Theme.f1Red.withValues(alpha: 0.1),
-                    foregroundColor: F1Theme.f1Red,
-                  ),
-                ),
-                const SizedBox(width: F1Theme.s),
-              ],
+      appBar: AppBar(
+        title: Text(_getTitle()),
+        backgroundColor: F1Theme.carbonBlack,
+        automaticallyImplyLeading: false, // No mostrar botón back
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _refreshCurrentScreen,
+            style: IconButton.styleFrom(
+              backgroundColor: F1Theme.f1Red.withValues(alpha: 0.1),
+              foregroundColor: F1Theme.f1Red,
             ),
+          ),
+          const SizedBox(width: F1Theme.s),
+        ],
+      ),
       body: PageView(
         controller: _pageController,
         onPageChanged: (index) {
@@ -284,30 +301,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         },
         children: _screens,
       ),
-      bottomNavigationBar: !isWeb
-          ? F1BottomNavigation(
-              currentIndex: _currentIndex,
-              onTap: _onNavTap,
-              items: const [
-                F1BottomNavItem(
-                  icon: CupertinoIcons.house_fill,
-                  label: 'Inicio',
-                ),
-                F1BottomNavItem(
-                  icon: CupertinoIcons.list_bullet_below_rectangle,
-                  label: 'Resultados',
-                ),
-                F1BottomNavItem(
-                  icon: CupertinoIcons.person_3_fill,
-                  label: 'Torneos',
-                ),
-                F1BottomNavItem(
-                  icon: CupertinoIcons.person_fill,
-                  label: 'Perfil',
-                ),
-              ],
-            )
-          : null,
+      bottomNavigationBar: F1BottomNavigation(
+        currentIndex: _currentIndex,
+        onTap: _onNavTap,
+        items: const [
+          F1BottomNavItem(
+            icon: CupertinoIcons.house_fill,
+            label: 'Inicio',
+          ),
+          F1BottomNavItem(
+            icon: CupertinoIcons.list_bullet_below_rectangle,
+            label: 'Resultados',
+          ),
+          F1BottomNavItem(
+            icon: CupertinoIcons.person_3_fill,
+            label: 'Torneos',
+          ),
+          F1BottomNavItem(
+            icon: CupertinoIcons.person_fill,
+            label: 'Perfil',
+          ),
+        ],
+      ),
     );
   }
 
@@ -582,6 +597,33 @@ class _HomeScreenBodyState extends State<_HomeScreenBody> {
       );
     }
 
+    final isWeb = ResponsiveLayout.isWeb(context);
+    
+    if (isWeb) {
+      // Grid web moderno con mejor spacing y aspecto
+      return Container(
+        padding: const EdgeInsets.all(24),
+        child: GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: ResponsiveLayout.isDesktop(context) ? 3 : 2,
+            crossAxisSpacing: 24,
+            mainAxisSpacing: 24,
+            childAspectRatio: 1.0,
+          ),
+          itemCount: races.length,
+          itemBuilder: (context, index) {
+            final race = races[index];
+            return ModernRaceCard(
+              race: race,
+              onPredict: () => _onPredictRace(race),
+              onViewResults: () => _onViewRaceResults(race),
+            );
+          },
+        ),
+      );
+    }
+
+    // Grid móvil tradicional
     return ResponsiveGrid(
       mobileColumns: 1,
       tabletColumns: 2,
@@ -591,81 +633,92 @@ class _HomeScreenBodyState extends State<_HomeScreenBody> {
     );
   }
 
-  Widget _buildRaceItem(Race race) {
-    return RaceCard(
-      race: race,
-      onPredict: () {
-        Future<void>(() async {
-          final initialRaceId = '${race.season}_${race.round}';
-
-          if (race.hasBet) {
-            if (mounted) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ResultsScreen(initialRaceId: initialRaceId),
-                ),
-              );
-            }
-            return;
-          }
-
-          final alreadyHasBet = betResults.any((b) =>
-              b.season.toString() == race.season.toString() &&
-              b.round.toString() == race.round.toString());
-
-          if (alreadyHasBet && mounted) {
-            setState(() {
-              races = races
-                  .map((r) => (r.season == race.season && r.round == race.round)
-                      ? r.copyWith(hasBet: true)
-                      : r)
-                  .toList();
-            });
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ResultsScreen(initialRaceId: initialRaceId),
-              ),
-            );
-            return;
-          }
-
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BetScreen(
-                  raceName: race.name,
-                  date: race.date,
-                  circuit: race.circuit,
-                  season: race.season,
-                  round: race.round,
-                  hasSprint: race.hasSprint,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                forceUpdateBetStatus();
-              }
-            });
-          }
-        });
-      },
-      onViewResults: () {
-        if (race.hasBet) {
+  void _onPredictRace(Race race) {
+    // Doble validación: flag local y verificación al vuelo desde el backend
+    Future<void>(() async {
+      final initialRaceId = '${race.season}_${race.round}';
+      
+      // Primera verificación: estado local
+      if (race.hasBet) {
+        if (mounted) {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ResultsScreen(
-                initialRaceId: '${race.season}_${race.round}',
-              ),
+              builder: (context) =>
+                  ResultsScreen(initialRaceId: initialRaceId),
             ),
           );
         }
-      },
+        return;
+      }
+
+      // Segunda verificación: verificar localmente en betResults cargados
+      final alreadyHasBet = betResults.any((b) =>
+          b.season.toString() == race.season.toString() &&
+          b.round.toString() == race.round.toString());
+      
+      if (alreadyHasBet && mounted) {
+        // Actualizar estado local para reflejar los datos
+        setState(() {
+          races = races
+              .map((r) =>
+                  (r.season == race.season && r.round == race.round)
+                      ? r.copyWith(hasBet: true)
+                      : r)
+              .toList();
+        });
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                ResultsScreen(initialRaceId: initialRaceId),
+          ),
+        );
+        return;
+      }
+
+      // Si no hay apuesta, permitir crearla
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BetScreen(
+              raceName: race.name,
+              date: race.date,
+              circuit: race.circuit,
+              season: race.season,
+              round: race.round,
+              hasSprint: race.hasSprint,
+            ),
+          ),
+        ).then((_) {
+          if (mounted) {
+            // Forzar actualización completa para sincronizar el estado
+            forceUpdateBetStatus();
+          }
+        });
+      }
+    });
+  }
+
+  void _onViewRaceResults(Race race) {
+    if (race.hasBet) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ResultsScreen(
+            initialRaceId: '${race.season}_${race.round}',
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildRaceItem(Race race) {
+    return RaceCard(
+      race: race,
+      onPredict: () => _onPredictRace(race),
+      onViewResults: () => _onViewRaceResults(race),
     );
   }
 }

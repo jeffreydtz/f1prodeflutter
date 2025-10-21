@@ -246,6 +246,7 @@ class ModernRaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 400, // Altura fija para consistencia
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -255,17 +256,17 @@ class ModernRaceCard extends StatelessWidget {
             const Color(0xFF111111),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: F1Theme.borderGrey.withValues(alpha: 0.2),
+          color: F1Theme.borderGrey.withValues(alpha: 0.3),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withValues(alpha: 0.4),
             spreadRadius: 0,
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

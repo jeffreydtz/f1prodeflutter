@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:flutter/foundation.dart';
 import '../utils/logger.dart';
+import 'secure_storage_service.dart';
 
 import '../models/betresult.dart';
 import '../models/user.dart';
@@ -26,6 +27,9 @@ class ApiService {
 
   String? _accessToken;
   String? _refreshToken;
+
+  // Secure storage service
+  final SecureStorageService _secureStorage = SecureStorageService();
 
   // Cache para evitar llamadas repetidas
   Map<String, dynamic> _cache = {};
@@ -233,8 +237,8 @@ class ApiService {
   Future<String?> _getAccessToken() async {
     if (_accessToken == null) {
       try {
-        final prefs = await _storage;
-        _accessToken = prefs.getString('access_token');
+        // Load from secure storage
+        _accessToken = await _secureStorage.getAccessToken();
         debugPrint(
             '[ApiService] Token from storage: ${_accessToken != null ? 'Found' : 'Not found'}');
 
@@ -262,8 +266,8 @@ class ApiService {
           }
         }
       } catch (e) {
-        debugPrint('[ApiService] Error accessing SharedPreferences: $e');
-        // Error accediendo a SharedPreferences, puede ocurrir en web móvil
+        debugPrint('[ApiService] Error accessing secure storage: $e');
+        // Error accediendo a secure storage
         // Intentar retornar el token en memoria si existe
       }
     }
@@ -275,10 +279,11 @@ class ApiService {
   Future<String?> _getRefreshToken() async {
     if (_refreshToken == null) {
       try {
-        final prefs = await _storage;
-        _refreshToken = prefs.getString('refresh_token');
+        // Load from secure storage
+        _refreshToken = await _secureStorage.getRefreshToken();
       } catch (e) {
-        // Error accediendo a SharedPreferences
+        // Error accediendo a secure storage
+        debugPrint('[ApiService] Error accessing refresh token: $e');
       }
     }
     return _refreshToken;
@@ -320,8 +325,6 @@ class ApiService {
 
   Future<void> _saveTokens({String? accessToken, String? refreshToken}) async {
     try {
-      final prefs = await _storage;
-
       // Actualizar en memoria primero para garantizar disponibilidad
       if (accessToken != null) {
         _accessToken = accessToken;
@@ -330,12 +333,13 @@ class ApiService {
         _refreshToken = refreshToken;
       }
 
-      // Luego intentar guardar en persistencia
+      // Guardar en secure storage (iOS/Android) o SharedPreferences (Web)
       if (accessToken != null) {
-        await prefs.setString('access_token', accessToken);
+        await _secureStorage.saveAccessToken(accessToken);
 
-        // Extraer y guardar más información del usuario del token JWT
+        // Extraer y guardar más información del usuario del token JWT en SharedPreferences
         try {
+          final prefs = await _storage;
           final decodedToken = JwtDecoder.decode(accessToken);
           if (decodedToken.containsKey('user_id')) {
             final userId = decodedToken['user_id'].toString();
@@ -354,21 +358,23 @@ class ApiService {
         }
       }
       if (refreshToken != null) {
-        await prefs.setString('refresh_token', refreshToken);
+        await _secureStorage.saveRefreshToken(refreshToken);
       }
     } catch (e) {
       // Error guardando tokens, pero ya están en memoria
+      debugPrint('[ApiService] Error saving tokens: $e');
     }
   }
 
   Future<void> _loadTokens() async {
     try {
-      final prefs = await _storage;
-      _accessToken = prefs.getString('access_token');
-      _refreshToken = prefs.getString('refresh_token');
+      // Load tokens from secure storage
+      _accessToken = await _secureStorage.getAccessToken();
+      _refreshToken = await _secureStorage.getRefreshToken();
 
       // Intentar cargar datos del usuario desde SharedPreferences
       if (_accessToken != null) {
+        final prefs = await _storage;
         final userId = prefs.getString('user_id');
         final username = prefs.getString('username');
         final email = prefs.getString('email');
@@ -396,17 +402,25 @@ class ApiService {
       }
     } catch (e) {
       // Error cargando tokens, continuar con valores null
+      debugPrint('[ApiService] Error loading tokens: $e');
     }
   }
 
   Future<void> _clearTokens() async {
     try {
+      // Clear tokens from secure storage
+      await _secureStorage.deleteTokens();
+
+      // Clear user data from SharedPreferences
       final prefs = await _storage;
-      await prefs.remove('access_token');
-      await prefs.remove('refresh_token');
       await prefs.remove('user_id');
+      await prefs.remove('username');
+      await prefs.remove('email');
+      await prefs.remove('points');
+      await prefs.remove('avatar');
     } catch (e) {
       // Error borrando tokens
+      debugPrint('[ApiService] Error clearing tokens: $e');
     } finally {
       // Asegurar que se borren de memoria en cualquier caso
       _accessToken = null;

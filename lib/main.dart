@@ -4,6 +4,7 @@ import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'services/api_service.dart';
+import 'services/secure_storage_service.dart';
 import 'theme/f1_theme.dart';
 // Importaciones web condicionales
 import 'web_imports.dart'
@@ -24,6 +25,9 @@ void main() async {
   if (kIsWeb) {
     setUrlStrategy(PathUrlStrategy());
   }
+
+  // Inicializar SecureStorageService
+  await SecureStorageService().init();
 
   // Inicializar ApiService
   final apiService = ApiService();

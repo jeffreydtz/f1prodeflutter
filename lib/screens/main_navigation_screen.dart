@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
 import '../widgets/f1_widgets.dart';
-import '../layouts/web_app_layout.dart';
+import '../layouts/modern_web_layout.dart';
 import '../widgets/web_dashboard_widgets.dart';
 import '../theme/f1_theme.dart';
 import '../services/api_service.dart';
@@ -255,7 +255,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (isWeb) {
       // Layout web moderno con sidebar
-      return WebAppLayout(
+      return ModernWebLayout(
         title: _getTitle(),
         currentIndex: _currentIndex,
         onNavigationChanged: (index) {
@@ -601,14 +601,14 @@ class _HomeScreenBodyState extends State<_HomeScreenBody> {
     
     if (isWeb) {
       // Grid web moderno con mejor spacing y aspecto
-      return Container(
-        padding: const EdgeInsets.all(24),
+      return Padding(
+        padding: const EdgeInsets.all(32),
         child: GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: ResponsiveLayout.isDesktop(context) ? 3 : 2,
-            crossAxisSpacing: 24,
-            mainAxisSpacing: 24,
-            childAspectRatio: 1.0,
+            crossAxisSpacing: 32,
+            mainAxisSpacing: 32,
+            childAspectRatio: ResponsiveLayout.isDesktop(context) ? 0.85 : 1.0,
           ),
           itemCount: races.length,
           itemBuilder: (context, index) {

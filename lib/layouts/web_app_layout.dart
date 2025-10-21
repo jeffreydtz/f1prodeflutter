@@ -41,7 +41,7 @@ class _WebAppLayoutState extends State<WebAppLayout>
       vsync: this,
     );
     _sidebarAnimation = Tween<double>(
-      begin: 240,
+      begin: 280,
       end: 80,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -49,7 +49,8 @@ class _WebAppLayoutState extends State<WebAppLayout>
     ));
 
     _loadUserData();
-    _animationController.forward();
+    // Inicializar expandido (reverse = expanded)
+    _animationController.reset();
   }
 
   void _loadUserData() {
@@ -66,9 +67,9 @@ class _WebAppLayoutState extends State<WebAppLayout>
       _sidebarExpanded = !_sidebarExpanded;
     });
     if (_sidebarExpanded) {
-      _animationController.reverse();
+      _animationController.reverse(); // Expandir = reverse (280px)
     } else {
-      _animationController.forward();
+      _animationController.forward(); // Contraer = forward (80px)
     }
   }
 

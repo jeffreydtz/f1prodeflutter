@@ -4,6 +4,7 @@
 /// Features minimalistic design with emphasis on speed, precision, and modern UI patterns.
 /// Optimized for both mobile and web platforms.
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -15,6 +16,9 @@ class F1Theme {
   static const Color f1Red = Color(0xFFFF1801);
   static const Color f1RedDark = Color(0xFFE61601);
   static const Color f1RedLight = Color(0xFFFF4B3D);
+  static const Color telemetryTeal = Color(0xFF00E5FF);
+  static const Color hyperdrivePurple = Color(0xFF5E17EB);
+  static const Color pulsePink = Color(0xFFFF3CAC);
 
   // NEUTRAL COLORS
   static const Color carbonBlack = Color(0xFF0C0C0C);
@@ -201,6 +205,16 @@ class F1Theme {
     return ThemeData(
       brightness: brightness,
       useMaterial3: true,
+      visualDensity: VisualDensity.adaptivePlatformDensity,
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
 
       // COLOR SCHEME
       colorScheme: ColorScheme.fromSeed(
@@ -244,6 +258,7 @@ class F1Theme {
       // CARD THEME
       cardTheme: CardTheme(
         color: isDark ? darkGrey : Colors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: elevation2,
         shadowColor: Colors.black.withOpacity(0.1),
         shape: RoundedRectangleBorder(
@@ -433,7 +448,8 @@ class F1Theme {
 
       // SNACK BAR THEME
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: isDark ? mediumGrey : Colors.grey[800],
+        backgroundColor:
+            isDark ? mediumGrey.withOpacity(0.95) : Colors.grey[900]!,
         contentTextStyle: bodyMedium,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusM),
@@ -483,6 +499,13 @@ class F1Theme {
         size: 24,
       ),
 
+      // SCROLLBAR THEME
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: MaterialStateProperty.all(f1Red.withOpacity(0.6)),
+        thickness: MaterialStateProperty.all(6),
+        radius: const Radius.circular(radiusM),
+      ),
+
       // PRIMARY ICON THEME
       primaryIconTheme: const IconThemeData(
         color: Colors.white,
@@ -526,6 +549,26 @@ class F1Theme {
     colors: [f1Red, f1RedDark],
   );
 
+  static const LinearGradient nightRaceGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      carbonBlack,
+      Color(0xFF11111F),
+      Color(0xFF1C0300),
+    ],
+    stops: [0.0, 0.55, 1.0],
+  );
+
+  static const LinearGradient telemetryGradient = LinearGradient(
+    begin: Alignment.topRight,
+    end: Alignment.bottomLeft,
+    colors: [
+      telemetryTeal,
+      pulsePink,
+    ],
+  );
+
   static const LinearGradient carbonGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
@@ -560,6 +603,14 @@ class F1Theme {
           color: color.withOpacity(0.3),
           blurRadius: 12,
           offset: const Offset(0, 4),
+        ),
+      ];
+
+  static List<BoxShadow> softGlow(Color color, {double spread = 12}) => [
+        BoxShadow(
+          color: color.withOpacity(0.35),
+          blurRadius: spread,
+          spreadRadius: spread * 0.25,
         ),
       ];
 }

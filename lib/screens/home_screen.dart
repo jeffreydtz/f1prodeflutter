@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../models/race.dart';
 import '../models/betresult.dart';
@@ -41,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchInitialData() async {
     if (!mounted) return;
-    
+
     setState(() {
       _loading = true;
       _hasError = false;
@@ -77,36 +78,40 @@ class _HomeScreenState extends State<HomeScreen> {
   // Método optimizado para actualizar las carreras con la información de predicciones
   Future<void> _updateRacesWithBetInfo() async {
     if (!mounted) return;
-    
+
     debugPrint('[Home] Updating races with bet info');
     debugPrint('[Home] BetResults count: ${betResults.length}');
-    
+
     // Crear un Set para búsqueda rápida de apuestas existentes
-    final Set<String> existingBets = betResults.map((bet) => '${bet.season}_${bet.round}').toSet();
-    
+    final Set<String> existingBets =
+        betResults.map((bet) => '${bet.season}_${bet.round}').toSet();
+
     // Crear una nueva lista de carreras con la información de apuestas actualizada
     List<Race> updatedRaces = [];
-    
+
     for (Race race in races) {
       // Verificación local rápida usando Set.contains (O(1))
       final raceKey = '${race.season}_${race.round}';
       bool hasBet = existingBets.contains(raceKey);
-      debugPrint('[Home] Race ${race.name} (${race.season}-${race.round}): has bet = $hasBet');
-      
+      debugPrint(
+          '[Home] Race ${race.name} (${race.season}-${race.round}): has bet = $hasBet');
+
       // Crear race actualizada si es necesario
       if (race.hasBet != hasBet) {
-        debugPrint('[Home] Updating race ${race.name}: hasBet ${race.hasBet} -> $hasBet');
+        debugPrint(
+            '[Home] Updating race ${race.name}: hasBet ${race.hasBet} -> $hasBet');
         updatedRaces.add(race.copyWith(hasBet: hasBet));
       } else {
         updatedRaces.add(race);
       }
     }
-    
+
     if (mounted) {
       setState(() {
         races = updatedRaces;
       });
-      debugPrint('[Home] Races updated. Bets found: ${updatedRaces.where((r) => r.hasBet).length}');
+      debugPrint(
+          '[Home] Races updated. Bets found: ${updatedRaces.where((r) => r.hasBet).length}');
     }
   }
 
@@ -152,11 +157,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   // Método para forzar la actualización del estado de apuestas
   Future<void> forceUpdateBetStatus() async {
     if (!mounted) return;
-    
+
     debugPrint('[Home] Force updating bet status');
     await _fetchBetResults();
     await _updateRacesWithBetInfo();
@@ -166,7 +170,35 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final isWeb = ResponsiveLayout.isWeb(context);
 
+    Widget content;
+    if (_loading) {
+      content = KeyedSubtree(
+        key: const ValueKey('home-loading'),
+        child: Center(
+          child: F1LoadingIndicator(
+            message: 'Sincronizando el paddock...',
+          ),
+        ),
+      );
+    } else if (_hasError) {
+      content = KeyedSubtree(
+        key: const ValueKey('home-error'),
+        child: F1ErrorState(
+          title: 'Error al cargar',
+          subtitle: _errorMessage ?? 'Error desconocido',
+          actionText: 'Reintentar',
+          onAction: _fetchInitialData,
+        ),
+      );
+    } else {
+      content = KeyedSubtree(
+        key: const ValueKey('home-content'),
+        child: _buildRacesList(),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: isWeb
           ? WebNavbar(
               title: 'F1 Prode',
@@ -175,35 +207,13 @@ class _HomeScreenState extends State<HomeScreen> {
               showBackButton: Navigator.canPop(context),
               onBackPressed: () => Navigator.of(context).pop(),
             )
-          : AppBar(
-              title: const Text('F1 Prode'),
-              backgroundColor: F1Theme.carbonBlack,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  onPressed: _fetchInitialData,
-                  style: IconButton.styleFrom(
-                    backgroundColor: F1Theme.f1Red.withValues(alpha: 0.1),
-                    foregroundColor: F1Theme.f1Red,
-                  ),
-                ),
-                const SizedBox(width: F1Theme.s),
-              ],
-            ),
-      body: _loading
-          ? Center(
-              child: F1LoadingIndicator(
-                message: 'Cargando temporada 2025...',
-              ),
-            )
-          : _hasError
-              ? F1ErrorState(
-                  title: 'Error al cargar',
-                  subtitle: _errorMessage ?? 'Error desconocido',
-                  actionText: 'Reintentar',
-                  onAction: _fetchInitialData,
-                )
-              : _buildRacesList(),
+          : _buildMobileAppBar(),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 320),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInOutCubic,
+        child: content,
+      ),
       bottomNavigationBar: !isWeb
           ? F1BottomNavigation(
               currentIndex: _selectedIndex,
@@ -213,7 +223,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
                 switch (index) {
                   case 0:
-                    // Ya estamos en home, no hacer nada
                     break;
                   case 1:
                     Navigator.pushNamed(context, '/results');
@@ -249,108 +258,426 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  PreferredSizeWidget _buildMobileAppBar() {
+    return AppBar(
+      titleSpacing: 0,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      automaticallyImplyLeading: false,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Temporada ${DateTime.now().year}',
+            style: F1Theme.labelSmall.copyWith(
+              color: F1Theme.textGrey,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'F1 Prode',
+            style: F1Theme.headlineMedium.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh_rounded),
+          onPressed: _fetchInitialData,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withOpacity(0.06),
+            foregroundColor: F1Theme.f1Red,
+          ),
+        ),
+        const SizedBox(width: F1Theme.s),
+      ],
+    );
+  }
+
   Widget _buildRacesList() {
     if (races.isEmpty) {
-      return F1EmptyState(
-        icon: Icons.sports_motorsports,
-        title: 'No hay carreras disponibles',
-        subtitle: 'Las carreras aparecerán aquí cuando estén disponibles',
-        actionText: 'Actualizar',
-        onAction: _fetchInitialData,
+      return Center(
+        child: F1EmptyState(
+          icon: Icons.sports_motorsports,
+          title: 'No hay carreras disponibles',
+          subtitle: 'Las carreras aparecerán aquí cuando estén disponibles',
+          actionText: 'Actualizar',
+          onAction: _fetchInitialData,
+        ),
       );
     }
 
-    return ResponsiveGrid(
-      mobileColumns: 1,
-      tabletColumns: 2,
-      desktopColumns: 3,
-      childAspectRatio: ResponsiveLayout.isMobile(context) ? 0.8 : 1.1,
-      children: races.map((race) => _buildRaceItem(race)).toList(),
+    final isMobile = ResponsiveLayout.isMobile(context);
+    final columns = _gridColumnCount(context);
+    final aspectRatio = columns == 1
+        ? 0.95
+        : columns == 2
+            ? 1.05
+            : 1.12;
+
+    final scrollView = CustomScrollView(
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
+      slivers: [
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(
+            F1Theme.m,
+            isMobile ? F1Theme.l : F1Theme.xl,
+            F1Theme.m,
+            F1Theme.l,
+          ),
+          sliver: SliverToBoxAdapter(
+            child: _buildHeroHeader(),
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.only(
+            left: F1Theme.s,
+            right: F1Theme.s,
+            bottom: MediaQuery.of(context).padding.bottom + F1Theme.xl,
+          ),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _buildRaceItem(races[index]),
+              childCount: races.length,
+            ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: F1Theme.m,
+              mainAxisSpacing: F1Theme.m,
+              childAspectRatio: aspectRatio,
+            ),
+          ),
+        ),
+      ],
     );
+
+    return isMobile
+        ? RefreshIndicator(
+            onRefresh: _fetchInitialData,
+            color: F1Theme.f1Red,
+            backgroundColor: Colors.black.withOpacity(0.6),
+            edgeOffset: 80,
+            child: scrollView,
+          )
+        : scrollView;
   }
 
   Widget _buildRaceItem(Race race) {
     return RaceCard(
       race: race,
-      onPredict: () {
-        // Doble validación: flag local y verificación al vuelo desde el backend
-        Future<void>(() async {
-          final initialRaceId = '${race.season}_${race.round}';
-          
-          // Primera verificación: estado local
-          if (race.hasBet) {
-            if (mounted) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ResultsScreen(initialRaceId: initialRaceId),
-                ),
-              );
-            }
-            return;
-          }
-
-          // Segunda verificación: verificar localmente en betResults cargados
-          final alreadyHasBet = betResults.any((b) =>
-              b.season.toString() == race.season.toString() &&
-              b.round.toString() == race.round.toString());
-          
-          if (alreadyHasBet && mounted) {
-            // Actualizar estado local para reflejar los datos
-            setState(() {
-              races = races
-                  .map((r) =>
-                      (r.season == race.season && r.round == race.round)
-                          ? r.copyWith(hasBet: true)
-                          : r)
-                  .toList();
-            });
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ResultsScreen(initialRaceId: initialRaceId),
-              ),
-            );
-            return;
-          }
-
-          // Si no hay apuesta, permitir crearla
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BetScreen(
-                  raceName: race.name,
-                  date: race.date,
-                  circuit: race.circuit,
-                  season: race.season,
-                  round: race.round,
-                  hasSprint: race.hasSprint,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                // Forzar actualización completa para sincronizar el estado
-                forceUpdateBetStatus();
-              }
-            });
-          }
-        });
-      },
-      onViewResults: () {
-        if (race.hasBet) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ResultsScreen(
-                initialRaceId: '${race.season}_${race.round}',
-              ),
-            ),
-          );
-        }
-      },
+      onPredict: () => _handleRaceSelection(race),
+      onViewResults: () => _openResults(race),
     );
   }
+
+  int _gridColumnCount(BuildContext context) {
+    if (ResponsiveLayout.isDesktop(context)) return 3;
+    if (ResponsiveLayout.isTablet(context)) return 2;
+    return 1;
+  }
+
+  Widget _buildHeroHeader() {
+    final now = DateTime.now();
+    Race? nextRace;
+    DateTime? nextRaceDate;
+
+    final upcomingRaces =
+        races.where((race) => DateTime.parse(race.date).isAfter(now)).toList()
+          ..sort(
+            (a, b) => DateTime.parse(a.date).compareTo(DateTime.parse(b.date)),
+          );
+    if (upcomingRaces.isNotEmpty) {
+      nextRace = upcomingRaces.first;
+      nextRaceDate = DateTime.parse(nextRace.date);
+    }
+
+    final totalRaces = races.length;
+    final predictedCount = races.where((r) => r.hasBet).length;
+    final upcomingCount = upcomingRaces.length;
+    final completedCount = races.where((r) => r.completed).length;
+    final completionPercent =
+        totalRaces == 0 ? 0 : ((predictedCount / totalRaces) * 100).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          nextRace != null ? 'Próxima parada' : 'Mantente listo',
+          style: F1Theme.labelSmall.copyWith(
+            color: F1Theme.textGrey,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: F1Theme.xs),
+        Text(
+          nextRace?.name ?? 'Todas las carreras sincronizadas',
+          style: F1Theme.displaySmall.copyWith(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: F1Theme.m),
+        F1Card(
+          padding: const EdgeInsets.all(F1Theme.l),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (nextRace != null && nextRaceDate != null) ...[
+                Text(
+                  DateFormat('dd MMM yyyy').format(nextRaceDate),
+                  style: F1Theme.labelSmall.copyWith(
+                    color: F1Theme.textGrey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: F1Theme.xs),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: F1Theme.textGrey,
+                    ),
+                    const SizedBox(width: F1Theme.s),
+                    Expanded(
+                      child: Text(
+                        nextRace.circuit,
+                        style: F1Theme.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: F1Theme.m),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(F1Theme.radiusM),
+                        child: LinearProgressIndicator(
+                          value: _countdownRatio(nextRaceDate),
+                          minHeight: 6,
+                          backgroundColor: Colors.white.withOpacity(0.08),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            F1Theme.telemetryTeal,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: F1Theme.m),
+                    F1SecondaryButton(
+                      text: 'Predecir ahora',
+                      icon: Icons.flash_on_rounded,
+                      onPressed: () => _handleRaceSelection(nextRace!),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Text(
+                  'No hay carreras próximamente',
+                  style: F1Theme.bodyMedium.copyWith(
+                    color: F1Theme.textGrey,
+                  ),
+                ),
+                const SizedBox(height: F1Theme.s),
+                Text(
+                  'Cuando se confirme la próxima carrera, la verás aquí con acceso rápido para predecir.',
+                  style: F1Theme.bodySmall.copyWith(
+                    color: F1Theme.textGrey,
+                  ),
+                ),
+              ],
+              const SizedBox(height: F1Theme.l),
+              _buildStatsRow(
+                predictedCount: predictedCount,
+                upcomingCount: upcomingCount,
+                completedCount: completedCount,
+                totalRaces: totalRaces,
+                completionPercent: completionPercent,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatsRow({
+    required int predictedCount,
+    required int upcomingCount,
+    required int completedCount,
+    required int totalRaces,
+    required int completionPercent,
+  }) {
+    return Wrap(
+      spacing: F1Theme.m,
+      runSpacing: F1Theme.m,
+      children: [
+        _buildStatTile(
+          label: 'Predicciones realizadas',
+          value: '$predictedCount',
+          color: F1Theme.telemetryTeal,
+          caption: '$completionPercent% de la temporada',
+        ),
+        _buildStatTile(
+          label: 'Carreras por disputar',
+          value: '$upcomingCount',
+          color: F1Theme.f1Red,
+          caption: upcomingCount > 0
+              ? 'Próximas oportunidades para sumar puntos'
+              : 'Prepárate para la próxima temporada',
+        ),
+        _buildStatTile(
+          label: 'Carreras completadas',
+          value: '$completedCount',
+          color: F1Theme.championGold,
+          caption: '$totalRaces en total',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatTile({
+    required String label,
+    required String value,
+    required Color color,
+    String? caption,
+  }) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 160, maxWidth: 240),
+      child: Container(
+        padding: const EdgeInsets.all(F1Theme.m),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(F1Theme.radiusL),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              color.withOpacity(0.18),
+              color.withOpacity(0.06),
+            ],
+          ),
+          border: Border.all(color: color.withOpacity(0.45)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: F1Theme.labelSmall.copyWith(
+                color: Colors.white.withOpacity(0.75),
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: F1Theme.xs),
+            Text(
+              value,
+              style: F1Theme.displaySmall.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+            if (caption != null) ...[
+              const SizedBox(height: F1Theme.xs),
+              Text(
+                caption,
+                style: F1Theme.labelSmall.copyWith(
+                  color: Colors.white.withOpacity(0.6),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  double _countdownRatio(DateTime raceDate) {
+    const totalWindow = Duration(days: 10);
+    final diff = raceDate.difference(DateTime.now());
+    if (diff.isNegative) return 1.0;
+    final ratio = 1 - (diff.inSeconds / totalWindow.inSeconds);
+    return ratio.clamp(0.0, 1.0);
+  }
+
+  void _handleRaceSelection(Race race) {
+    Future<void>(() async {
+      await _navigateToRace(race);
+    });
+  }
+
+  Future<void> _navigateToRace(Race race) async {
+    if (!mounted) return;
+    final raceId = _raceIdentifier(race);
+
+    if (race.hasBet) {
+      await _openResultsById(raceId);
+      return;
+    }
+
+    final alreadyHasBet = betResults.any(
+      (b) =>
+          b.season.toString() == race.season.toString() &&
+          b.round.toString() == race.round.toString(),
+    );
+
+    if (alreadyHasBet) {
+      if (mounted) {
+        setState(() {
+          races = races
+              .map(
+                (r) => (r.season == race.season && r.round == race.round)
+                    ? r.copyWith(hasBet: true)
+                    : r,
+              )
+              .toList();
+        });
+      }
+      await _openResultsById(raceId);
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BetScreen(
+          raceName: race.name,
+          date: race.date,
+          circuit: race.circuit,
+          season: race.season,
+          round: race.round,
+          hasSprint: race.hasSprint,
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    await forceUpdateBetStatus();
+  }
+
+  Future<void> _openResults(Race race) async {
+    await _openResultsById(_raceIdentifier(race));
+  }
+
+  Future<void> _openResultsById(String raceId) async {
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ResultsScreen(initialRaceId: raceId),
+      ),
+    );
+  }
+
+  String _raceIdentifier(Race race) => '${race.season}_${race.round}';
 }

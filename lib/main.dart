@@ -16,6 +16,7 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/create_tournament_screen.dart';
 import 'screens/join_tournament_screen.dart';
+import 'widgets/f1_background.dart';
 
 void main() async {
   // Asegurar que Flutter esté inicializado
@@ -92,6 +93,8 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       theme: F1Theme.darkTheme,
       themeMode: ThemeMode.dark,
+      builder: (context, child) =>
+          F1AppBackground(child: child ?? const SizedBox()),
       home: SplashScreen(
         apiService: widget.apiService,
         onInitialized: (bool success) {
@@ -106,7 +109,8 @@ class _MyAppState extends State<MyApp> {
         '/profile': (context) => const MainNavigationScreen(initialIndex: 3),
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/tournaments': (context) => const MainNavigationScreen(initialIndex: 2),
+        '/tournaments': (context) =>
+            const MainNavigationScreen(initialIndex: 2),
         '/bet': (context) => BetScreen(
               raceName: '',
               date: '',

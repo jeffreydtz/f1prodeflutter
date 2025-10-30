@@ -4,6 +4,8 @@
 /// Provides consistent UI components with built-in responsive behavior
 /// and Formula 1 aesthetic principles.
 
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/f1_theme.dart';
@@ -13,7 +15,7 @@ import '../theme/f1_theme.dart';
 // =============================================================================
 
 /// Primary F1 styled button with gradient background and racing aesthetics
-class F1PrimaryButton extends StatelessWidget {
+class F1PrimaryButton extends StatefulWidget {
   final String text;
   final VoidCallback? onPressed;
   final IconData? icon;
@@ -32,62 +34,132 @@ class F1PrimaryButton extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<F1PrimaryButton> createState() => _F1PrimaryButtonState();
+}
+
+class _F1PrimaryButtonState extends State<F1PrimaryButton> {
+  bool _hovered = false;
+  bool _pressed = false;
+  bool _focused = false;
+
+  bool get _isDisabled => widget.onPressed == null || widget.isLoading;
+
+  void _handleHover(bool hovered) {
+    if (_isDisabled) return;
+    setState(() => _hovered = hovered);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Widget button = Container(
-      decoration: BoxDecoration(
-        gradient: F1Theme.f1RedGradient,
-        borderRadius: BorderRadius.circular(F1Theme.radiusM),
-        boxShadow: F1Theme.coloredShadow(F1Theme.f1Red),
-      ),
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          padding: padding ??
-              const EdgeInsets.symmetric(
-                horizontal: F1Theme.l,
-                vertical: F1Theme.m,
+    final borderRadius = BorderRadius.circular(F1Theme.radiusXL);
+    final gradient = _isDisabled
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [F1Theme.mediumGrey, F1Theme.darkGrey],
+          )
+        : (_hovered || _focused)
+            ? F1Theme.telemetryGradient
+            : F1Theme.f1RedGradient;
+    final shadows = _isDisabled
+        ? <BoxShadow>[]
+        : (_hovered || _focused)
+            ? F1Theme.softGlow(F1Theme.f1Red, spread: 22)
+            : F1Theme.coloredShadow(F1Theme.f1Red);
+
+    Widget button = MouseRegion(
+      onEnter: (_) => _handleHover(true),
+      onExit: (_) => _handleHover(false),
+      child: Focus(
+        onFocusChange: (value) => setState(() => _focused = value),
+        child: AnimatedScale(
+          scale: _pressed
+              ? 0.97
+              : (_hovered || _focused)
+                  ? 1.015
+                  : 1.0,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            decoration: BoxDecoration(
+              gradient: gradient,
+              borderRadius: borderRadius,
+              boxShadow: shadows,
+              border: Border.all(
+                color: _focused
+                    ? F1Theme.telemetryTeal.withOpacity(0.6)
+                    : Colors.white.withOpacity(_hovered ? 0.08 : 0.04),
+                width: 1.2,
               ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(F1Theme.radiusM),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _isDisabled ? null : widget.onPressed,
+                borderRadius: borderRadius,
+                splashColor: Colors.white.withOpacity(0.15),
+                highlightColor: Colors.white.withOpacity(0.05),
+                onHighlightChanged: (value) {
+                  if (_isDisabled) return;
+                  setState(() => _pressed = value);
+                },
+                child: Padding(
+                  padding: widget.padding ??
+                      const EdgeInsets.symmetric(
+                        horizontal: F1Theme.xl,
+                        vertical: F1Theme.m,
+                      ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInBack,
+                    child: widget.isLoading
+                        ? const SizedBox(
+                            key: ValueKey('primary-loading'),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Row(
+                            key: const ValueKey('primary-content'),
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (widget.icon != null) ...[
+                                Icon(widget.icon, size: 20),
+                                const SizedBox(width: F1Theme.s),
+                              ],
+                              Text(
+                                widget.text.toUpperCase(),
+                                style: F1Theme.labelLarge.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-        child: isLoading
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 20),
-                    const SizedBox(width: F1Theme.s),
-                  ],
-                  Text(
-                    text,
-                    style: F1Theme.labelLarge.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
       ),
     );
 
-    return fullWidth ? SizedBox(width: double.infinity, child: button) : button;
+    return widget.fullWidth
+        ? SizedBox(width: double.infinity, child: button)
+        : button;
   }
 }
 
 /// Secondary F1 styled button with outline design
-class F1SecondaryButton extends StatelessWidget {
+class F1SecondaryButton extends StatefulWidget {
   final String text;
   final VoidCallback? onPressed;
   final IconData? icon;
@@ -106,50 +178,138 @@ class F1SecondaryButton extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    final buttonColor = color ?? F1Theme.f1Red;
+  State<F1SecondaryButton> createState() => _F1SecondaryButtonState();
+}
 
-    Widget button = OutlinedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: buttonColor,
-        side: BorderSide(color: buttonColor, width: 2),
-        padding: const EdgeInsets.symmetric(
-          horizontal: F1Theme.l,
-          vertical: F1Theme.m,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(F1Theme.radiusM),
-        ),
-      ),
-      child: isLoading
-          ? SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                color: buttonColor,
-                strokeWidth: 2,
+class _F1SecondaryButtonState extends State<F1SecondaryButton> {
+  bool _hovered = false;
+  bool _focused = false;
+  bool _pressed = false;
+
+  bool get _isDisabled => widget.onPressed == null || widget.isLoading;
+
+  void _handleHover(bool hovered) {
+    if (_isDisabled) return;
+    setState(() => _hovered = hovered);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = widget.color ?? F1Theme.telemetryTeal;
+    final effectiveColor = _isDisabled ? F1Theme.borderGrey : accent;
+    final borderRadius = BorderRadius.circular(F1Theme.radiusXL);
+    final borderColor = _isDisabled
+        ? F1Theme.borderGrey.withOpacity(0.8)
+        : effectiveColor.withOpacity(_focused ? 0.95 : 0.7);
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: _isDisabled
+          ? [
+              Colors.white.withOpacity(0.02),
+              Colors.white.withOpacity(0.0),
+            ]
+          : [
+              Colors.white.withOpacity(_hovered ? 0.08 : 0.02),
+              effectiveColor.withOpacity(_hovered ? 0.18 : 0.08),
+            ],
+    );
+    final shadows = _isDisabled
+        ? <BoxShadow>[]
+        : _hovered
+            ? F1Theme.softGlow(effectiveColor, spread: 14)
+            : [
+                BoxShadow(
+                  color: effectiveColor.withOpacity(0.22),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ];
+
+    Widget button = MouseRegion(
+      onEnter: (_) => _handleHover(true),
+      onExit: (_) => _handleHover(false),
+      child: Focus(
+        onFocusChange: (value) => setState(() => _focused = value),
+        child: AnimatedScale(
+          scale: _pressed
+              ? 0.97
+              : (_hovered || _focused)
+                  ? 1.01
+                  : 1.0,
+          duration: const Duration(milliseconds: 140),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: borderColor,
+                width: 1.4,
               ),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, size: 20),
-                  const SizedBox(width: F1Theme.s),
-                ],
-                Text(
-                  text,
-                  style: F1Theme.labelLarge.copyWith(
-                    fontWeight: FontWeight.w600,
+              gradient: gradient,
+              boxShadow: shadows,
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: borderRadius,
+                onTap: _isDisabled ? null : widget.onPressed,
+                splashColor: effectiveColor.withOpacity(0.15),
+                highlightColor: effectiveColor.withOpacity(0.05),
+                onHighlightChanged: (value) {
+                  if (_isDisabled) return;
+                  setState(() => _pressed = value);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: F1Theme.xl,
+                    vertical: F1Theme.m,
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: widget.isLoading
+                        ? SizedBox(
+                            key: const ValueKey('secondary-loading'),
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: effectiveColor,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Row(
+                            key: const ValueKey('secondary-content'),
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (widget.icon != null) ...[
+                                Icon(widget.icon,
+                                    size: 18, color: effectiveColor),
+                                const SizedBox(width: F1Theme.s),
+                              ],
+                              Text(
+                                widget.text,
+                                style: F1Theme.labelLarge.copyWith(
+                                  color: effectiveColor,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
-              ],
+              ),
             ),
+          ),
+        ),
+      ),
     );
 
-    return fullWidth ? SizedBox(width: double.infinity, child: button) : button;
+    return widget.fullWidth
+        ? SizedBox(width: double.infinity, child: button)
+        : button;
   }
 }
 
@@ -172,15 +332,34 @@ class F1TextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final buttonColor = color ?? F1Theme.f1Red;
 
+    final style = TextButton.styleFrom(
+      foregroundColor: buttonColor,
+      padding: const EdgeInsets.symmetric(
+        horizontal: F1Theme.m,
+        vertical: F1Theme.s,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(F1Theme.radiusM),
+      ),
+      textStyle: F1Theme.labelMedium.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+      ),
+    ).copyWith(
+      overlayColor: MaterialStateProperty.resolveWith(
+        (states) => buttonColor.withOpacity(0.12),
+      ),
+      backgroundColor: MaterialStateProperty.resolveWith(
+        (states) => states.contains(MaterialState.hovered) ||
+                states.contains(MaterialState.focused)
+            ? buttonColor.withOpacity(0.12)
+            : Colors.transparent,
+      ),
+    );
+
     return TextButton(
       onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: buttonColor,
-        padding: const EdgeInsets.symmetric(
-          horizontal: F1Theme.m,
-          vertical: F1Theme.s,
-        ),
-      ),
+      style: style,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -188,12 +367,7 @@ class F1TextButton extends StatelessWidget {
             Icon(icon, size: 18),
             const SizedBox(width: F1Theme.s),
           ],
-          Text(
-            text,
-            style: F1Theme.labelMedium.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(text),
         ],
       ),
     );
@@ -205,7 +379,7 @@ class F1TextButton extends StatelessWidget {
 // =============================================================================
 
 /// Base F1 card component with consistent styling
-class F1Card extends StatelessWidget {
+class F1Card extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
@@ -226,28 +400,85 @@ class F1Card extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<F1Card> createState() => _F1CardState();
+}
+
+class _F1CardState extends State<F1Card> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: margin ?? const EdgeInsets.all(F1Theme.s),
-      child: Material(
-        color: context.colors.surface,
-        elevation: elevation ?? F1Theme.elevation2,
-        borderRadius: BorderRadius.circular(F1Theme.radiusL),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(F1Theme.radiusL),
-          child: Container(
-            padding: padding ?? const EdgeInsets.all(F1Theme.m),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(F1Theme.radiusL),
-              border: hasBorder
-                  ? Border.all(
-                      color: borderColor ?? F1Theme.borderGrey,
-                      width: 1,
-                    )
-                  : null,
+    final borderRadius = BorderRadius.circular(F1Theme.radiusL);
+    final surface = context.colors.surface;
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        surface.withOpacity(0.92),
+        surface.withOpacity(_hovered ? 0.55 : 0.68),
+      ],
+    );
+    final border = widget.hasBorder
+        ? Border.all(
+            color: (widget.borderColor ?? F1Theme.borderGrey)
+                .withOpacity(_hovered ? 0.6 : 0.35),
+            width: 1.1,
+          )
+        : null;
+    final shadows = _hovered
+        ? F1Theme.softGlow(F1Theme.telemetryTeal.withOpacity(0.7), spread: 18)
+        : [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 16),
+              spreadRadius: -12,
             ),
-            child: child,
+          ];
+
+    return Container(
+      margin: widget.margin ?? const EdgeInsets.all(F1Theme.s),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            boxShadow: shadows,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: borderRadius,
+              splashColor: F1Theme.f1Red.withOpacity(0.08),
+              highlightColor: F1Theme.f1Red.withOpacity(0.03),
+              child: ClipRRect(
+                borderRadius: borderRadius,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: widget.elevation != null
+                        ? 8 + (widget.elevation! * 1.5)
+                        : 18,
+                    sigmaY: widget.elevation != null
+                        ? 8 + (widget.elevation! * 1.5)
+                        : 18,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    padding: widget.padding ?? const EdgeInsets.all(F1Theme.m),
+                    decoration: BoxDecoration(
+                      borderRadius: borderRadius,
+                      gradient: gradient,
+                      border: border,
+                    ),
+                    child: widget.child,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -256,7 +487,7 @@ class F1Card extends StatelessWidget {
 }
 
 /// Racing-themed card with checkered flag accent
-class F1RaceCard extends StatelessWidget {
+class F1RaceCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
@@ -275,64 +506,123 @@ class F1RaceCard extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<F1RaceCard> createState() => _F1RaceCardState();
+}
+
+class _F1RaceCardState extends State<F1RaceCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final accent = widget.accentColor;
+    final borderRadius = BorderRadius.circular(F1Theme.radiusXL);
+    final surface = context.colors.surface;
+    final gradient = LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        surface.withOpacity(0.92),
+        accent.withOpacity(_hovered ? 0.28 : 0.14),
+      ],
+    );
+    final border = Border.all(
+      color: accent.withOpacity(_hovered ? 0.6 : 0.35),
+      width: 1.6,
+    );
+
     return Container(
-      margin: margin ?? const EdgeInsets.all(F1Theme.s),
-      child: Material(
-        color: context.colors.surface,
-        elevation: F1Theme.elevation2,
-        borderRadius: BorderRadius.circular(F1Theme.radiusL),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(F1Theme.radiusL),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(F1Theme.radiusL),
-              border: Border.all(
-                color: accentColor.withOpacity(0.3),
-                width: 2,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  context.colors.surface,
-                  accentColor.withOpacity(0.05),
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                // Checkered flag pattern (optional)
-                if (showCheckeredFlag)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(F1Theme.radiusL),
-                          bottomLeft: Radius.circular(F1Theme.radiusM),
+      margin: widget.margin ?? const EdgeInsets.all(F1Theme.s),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            boxShadow: _hovered
+                ? F1Theme.softGlow(accent, spread: 20)
+                : F1Theme.coloredShadow(accent),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: widget.onTap,
+              borderRadius: borderRadius,
+              splashColor: accent.withOpacity(0.18),
+              highlightColor: accent.withOpacity(0.08),
+              child: ClipRRect(
+                borderRadius: borderRadius,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: gradient,
+                            border: border,
+                          ),
                         ),
-                        gradient: LinearGradient(
-                          colors: [accentColor, accentColor.darken],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.sports_motorsports,
-                        color: Colors.white,
-                        size: 20,
                       ),
                     ),
-                  ),
-                // Content
-                Padding(
-                  padding: padding ?? const EdgeInsets.all(F1Theme.m),
-                  child: child,
+                    Positioned.fill(
+                      child: AnimatedOpacity(
+                        opacity: _hovered ? 1 : 0,
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                accent.withOpacity(0.22),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (widget.showCheckeredFlag)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(F1Theme.radiusXL),
+                              bottomLeft: Radius.circular(F1Theme.radiusM),
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                accent,
+                                accent.darken,
+                              ],
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.sports_motorsports,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    Positioned.fill(
+                      child: Padding(
+                        padding:
+                            widget.padding ?? const EdgeInsets.all(F1Theme.m),
+                        child: widget.child,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

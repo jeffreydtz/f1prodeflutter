@@ -343,6 +343,11 @@
     // Primero verificamos que el script de flutter.js esté cargado correctamente
     document.addEventListener("DOMContentLoaded", function() {
       console.log('DOM cargado, verificando flutter.js...');
+
+      var faviconLink = document.querySelector('link[rel="icon"]');
+      if (faviconLink) {
+        faviconLink.href = new URL('logof1.png', document.baseURI).toString();
+      }
       
       // Detectar dispositivo móvil
       var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -474,39 +479,40 @@
       console.log('Ruta inicial detectada: ' + (initialRoute || 'null'));
 
       try {
-        await loader.load({
+        const engineInitializer = await loader.load({
           serviceWorker: {
             serviceWorkerVersion: serviceWorkerVersion,
           },
-          onEntrypointLoaded: async function(engineInitializer) {
-            console.log('Entrypoint cargado, inicializando engine...');
-            
-            try {
-              const appRunner = await engineInitializer.initializeEngine({
-                hostElement: document.querySelector('#flutter_app'),
-                initialRoute: initialRoute,
-              });
-
-              // Limpiar indicador de carga antes de ejecutar la app
-              document.getElementById('flutter_app').innerHTML = '';
-
-              await appRunner.runApp();
-              console.log('Aplicación Flutter iniciada correctamente');
-            } catch (e) {
-              console.log('ERROR al inicializar el engine: ' + e.message);
-              showErrorMessage('Error al inicializar Flutter: ' + e.message);
-              sessionStorage.setItem('flutter_load_error', 'true');
-            }
-          },
         });
+
+        console.log('Entrypoint cargado, inicializando engine...');
+
+        try {
+          const appRunner = await engineInitializer.initializeEngine({
+            hostElement: document.querySelector('#flutter_app'),
+            initialRoute: initialRoute,
+          });
+
+          // Limpiar indicador de carga antes de ejecutar la app
+          document.getElementById('flutter_app').innerHTML = '';
+
+          await appRunner.runApp();
+          console.log('Aplicación Flutter iniciada correctamente');
+        } catch (e) {
+          const message = e && e.message ? e.message : e;
+          console.log('ERROR al inicializar el engine: ' + message);
+          showErrorMessage('Error al inicializar Flutter: ' + message);
+          sessionStorage.setItem('flutter_load_error', 'true');
+        }
       } catch (e) {
-        console.log('ERROR al cargar Flutter con el nuevo loader: ' + e.message);
+        const message = e && e.message ? e.message : e;
+        console.log('ERROR al cargar Flutter con el nuevo loader: ' + message);
         if (typeof window.flutter !== 'undefined') {
           console.log('Intentando iniciar con la API moderna como fallback...');
           await iniciarFlutterModerno(window.flutter);
           return;
         }
-        showErrorMessage('Error al cargar Flutter: ' + e.message);
+        showErrorMessage('Error al cargar Flutter: ' + message);
         sessionStorage.setItem('flutter_load_error', 'true');
       }
     }
@@ -543,8 +549,9 @@
         await engineInitializer.autoStart();
         console.log('Aplicación Flutter iniciada correctamente (moderno)');
       } catch (e) {
-        console.log('ERROR al inicializar Flutter (método moderno): ' + e.message);
-        showErrorMessage('Error al inicializar Flutter: ' + e.message);
+        const message = e && e.message ? e.message : e;
+        console.log('ERROR al inicializar Flutter (método moderno): ' + message);
+        showErrorMessage('Error al inicializar Flutter: ' + message);
         sessionStorage.setItem('flutter_load_error', 'true');
       }
     }

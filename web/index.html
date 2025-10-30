@@ -319,7 +319,10 @@
 
         var bootstrapScript = document.createElement('script');
         bootstrapScript.type = 'application/javascript';
-        bootstrapScript.src = new URL('flutter_bootstrap.js', document.baseURI).toString();
+        // Use document.baseURI consistently with flutter.js loading
+        var bootstrapPath = new URL('flutter_bootstrap.js', document.baseURI).href;
+        console.log('Intentando cargar flutter_bootstrap.js desde: ' + bootstrapPath);
+        bootstrapScript.src = bootstrapPath;
         bootstrapScript.dataset.flutterBootstrap = 'true';
 
         bootstrapScript.onload = function() {
@@ -328,6 +331,7 @@
         };
 
         bootstrapScript.onerror = function(error) {
+          console.error('Error cargando flutter_bootstrap.js: ', error);
           reject(error);
         };
 

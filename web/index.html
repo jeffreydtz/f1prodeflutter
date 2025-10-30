@@ -30,7 +30,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="./logof1 copy.png"/>
+  <link rel="icon" type="image/png" href="./logof1.png"/>
 
   <title>F1 Prode</title>
   <link rel="manifest" href="./manifest.json">
@@ -444,7 +444,7 @@
     }
 
     // Función para iniciar Flutter
-    function iniciarFlutter() {
+    async function iniciarFlutter() {
       // Limpiar caché si hay problemas persistentes
       var hasPreviousError = sessionStorage.getItem('flutter_load_error');
       if (hasPreviousError) {
@@ -453,19 +453,72 @@
         sessionStorage.removeItem('flutter_load_error');
       }
       
-      if (typeof window.flutter === 'undefined') {
-        console.log('ERROR: No se encontró la API moderna de Flutter');
+      const loader = window._flutter?.loader;
+      if (!loader || typeof loader.load !== 'function') {
+        if (typeof window.flutter !== 'undefined') {
+          console.log('Loader clásico no disponible. Probando API moderna...');
+          await iniciarFlutterModerno(window.flutter);
+          return;
+        }
+
+        console.log('ERROR: No se encontró ningún loader de Flutter');
         showErrorMessage('No se pudo cargar Flutter. Intenta recargar la página o usa otro navegador.');
         sessionStorage.setItem('flutter_load_error', 'true');
         return;
       }
       
-      console.log('Iniciando Flutter con la API moderna...');
-      iniciarFlutterModerno();
+      console.log('Iniciando Flutter con el nuevo loader...');
+      
+      // Detectar ruta inicial
+      const initialRoute = detectResetPasswordRoute();
+      console.log('Ruta inicial detectada: ' + (initialRoute || 'null'));
+
+      try {
+        await loader.load({
+          serviceWorker: {
+            serviceWorkerVersion: serviceWorkerVersion,
+          },
+          onEntrypointLoaded: async function(engineInitializer) {
+            console.log('Entrypoint cargado, inicializando engine...');
+            
+            try {
+              const appRunner = await engineInitializer.initializeEngine({
+                hostElement: document.querySelector('#flutter_app'),
+                initialRoute: initialRoute,
+              });
+
+              // Limpiar indicador de carga antes de ejecutar la app
+              document.getElementById('flutter_app').innerHTML = '';
+
+              await appRunner.runApp();
+              console.log('Aplicación Flutter iniciada correctamente');
+            } catch (e) {
+              console.log('ERROR al inicializar el engine: ' + e.message);
+              showErrorMessage('Error al inicializar Flutter: ' + e.message);
+              sessionStorage.setItem('flutter_load_error', 'true');
+            }
+          },
+        });
+      } catch (e) {
+        console.log('ERROR al cargar Flutter con el nuevo loader: ' + e.message);
+        if (typeof window.flutter !== 'undefined') {
+          console.log('Intentando iniciar con la API moderna como fallback...');
+          await iniciarFlutterModerno(window.flutter);
+          return;
+        }
+        showErrorMessage('Error al cargar Flutter: ' + e.message);
+        sessionStorage.setItem('flutter_load_error', 'true');
+      }
     }
     
     // Método moderno para iniciar Flutter (como fallback)
-    async function iniciarFlutterModerno() {
+    async function iniciarFlutterModerno(flutter) {
+      if (!flutter) {
+        console.log('ERROR: API moderna de Flutter no disponible para fallback');
+        showErrorMessage('No se pudo cargar Flutter. Intenta recargar la página o usa otro navegador.');
+        sessionStorage.setItem('flutter_load_error', 'true');
+        return;
+      }
       try {
         console.log('Intentando cargar Flutter con método moderno...');
         await flutter.load({

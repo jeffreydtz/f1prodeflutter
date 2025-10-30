@@ -249,7 +249,7 @@
 
   <script>
     // The value below is injected by flutter build, do not touch.
-    var serviceWorkerVersion = null;
+    const serviceWorkerVersion = '{{flutter_service_worker_version}}';
     
     // Soporte para detección de errores
     window.onerror = function(message, source, lineno, colno, error) {
@@ -453,70 +453,26 @@
         sessionStorage.removeItem('flutter_load_error');
       }
       
-      if (typeof _flutter === 'undefined') {
-        console.log('_flutter no está definido. Comprobando alternativas...');
-        
-        if (typeof window.flutter !== 'undefined') {
-          console.log('Usando la API moderna de Flutter...');
-          // Método moderno
-          iniciarFlutterModerno();
-          return;
-        }
-        
-        console.log('ERROR: No se encuentra ninguna API de Flutter');
+      if (typeof window.flutter === 'undefined') {
+        console.log('ERROR: No se encontró la API moderna de Flutter');
         showErrorMessage('No se pudo cargar Flutter. Intenta recargar la página o usa otro navegador.');
         sessionStorage.setItem('flutter_load_error', 'true');
         return;
       }
       
-      console.log('Iniciando carga de Flutter con método clásico...');
-      
-      // Detectar ruta inicial
-      var initialRoute = detectResetPasswordRoute();
-      console.log('Ruta inicial detectada: ' + (initialRoute || 'null'));
-      
-      try {
-        // Initialize Flutter using the old method
-        _flutter.loader.loadEntrypoint({
-          serviceWorker: {
-            serviceWorkerVersion: serviceWorkerVersion,
-          },
-          onEntrypointLoaded: async function(engineInitializer) {
-            console.log('Entrypoint cargado, iniciando engine...');
-            
-            try {
-              var appRunner = await engineInitializer.initializeEngine({
-                hostElement: document.querySelector('#flutter_app'),
-                initialRoute: initialRoute
-              });
-              
-              console.log('Engine inicializado, ejecutando app...');
-              
-              // Limpiar indicador de carga antes de ejecutar la app
-              document.getElementById('flutter_app').innerHTML = '';
-              
-              await appRunner.runApp();
-              
-              console.log('Aplicación Flutter iniciada correctamente');
-            } catch (e) {
-              console.log('ERROR al inicializar el engine: ' + e.message);
-              showErrorMessage('Error al inicializar Flutter: ' + e.message);
-              sessionStorage.setItem('flutter_load_error', 'true');
-            }
-          }
-        });
-      } catch (e) {
-        console.log('ERROR en loadEntrypoint: ' + e.message);
-        showErrorMessage('Error al cargar Flutter: ' + e.message);
-        sessionStorage.setItem('flutter_load_error', 'true');
-      }
+      console.log('Iniciando Flutter con la API moderna...');
+      iniciarFlutterModerno();
     }
     
     // Método moderno para iniciar Flutter (como fallback)
     async function iniciarFlutterModerno() {
       try {
         console.log('Intentando cargar Flutter con método moderno...');
-        await flutter.load();
+        await flutter.load({
+          serviceWorker: {
+            serviceWorkerVersion: serviceWorkerVersion,
+          },
+        });
         
         // Detectar ruta inicial
         const initialRoute = detectResetPasswordRoute();

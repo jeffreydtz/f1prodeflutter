@@ -308,6 +308,33 @@
       console.log(mensaje);
     }
     
+    function loadFlutterBootstrap() {
+      return new Promise(function(resolve, reject) {
+        var existing = document.querySelector('script[data-flutter-bootstrap="true"]');
+        if (existing) {
+          console.log('flutter_bootstrap.js ya estaba cargado');
+          resolve();
+          return;
+        }
+
+        var bootstrapScript = document.createElement('script');
+        bootstrapScript.type = 'application/javascript';
+        bootstrapScript.src = new URL('flutter_bootstrap.js', document.baseURI).toString();
+        bootstrapScript.dataset.flutterBootstrap = 'true';
+
+        bootstrapScript.onload = function() {
+          console.log('flutter_bootstrap.js cargado correctamente');
+          resolve();
+        };
+
+        bootstrapScript.onerror = function(error) {
+          reject(error);
+        };
+
+        document.head.appendChild(bootstrapScript);
+      });
+    }
+    
     // Función para limpiar el caché de la aplicación
     function clearAppCache() {
       console.log('Intentando limpiar caché...');
@@ -393,7 +420,12 @@
         clearTimeout(flutterLoadTimeout);
         console.log('flutter.js cargado correctamente');
         // Iniciar la aplicación
-        iniciarFlutter();
+        loadFlutterBootstrap()
+          .then(() => iniciarFlutter())
+          .catch(function(error) {
+            console.log('ERROR al cargar flutter_bootstrap.js: ' + error);
+            showErrorMessage('No se pudo inicializar la aplicación (bootstrap). Intenta recargar.');
+          });
       };
       
       // Si hay un error al cargar el script
@@ -413,7 +445,12 @@
         scriptTag.onload = function() {
           clearTimeout(secondAttemptTimeout);
           console.log('flutter.js cargado con ruta absoluta');
-          iniciarFlutter();
+          loadFlutterBootstrap()
+            .then(() => iniciarFlutter())
+            .catch(function(error) {
+              console.log('ERROR al cargar flutter_bootstrap.js (fallback): ' + error);
+              showErrorMessage('No se pudo inicializar la aplicación (bootstrap). Intenta recargar.');
+            });
         };
         
         scriptTag.onerror = function() {
@@ -473,6 +510,15 @@
       }
       
       console.log('Iniciando Flutter con el nuevo loader...');
+
+      window._flutter = window._flutter || {};
+      window._flutter.buildConfig = window._flutter.buildConfig || {};
+      if (!window._flutter.buildConfig.entrypoint) {
+        window._flutter.buildConfig.entrypoint = 'main.dart.js';
+      }
+      if (!window._flutter.buildConfig.assetBase) {
+        window._flutter.buildConfig.assetBase = new URL('.', document.baseURI).toString();
+      }
       
       // Detectar ruta inicial
       const initialRoute = detectResetPasswordRoute();

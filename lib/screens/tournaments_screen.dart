@@ -7,6 +7,7 @@ import 'tournament_details_screen.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
 import '../widgets/f1_widgets.dart';
+import '../theme/f1_theme.dart';
 
 class TournamentsScreen extends StatefulWidget {
   const TournamentsScreen({Key? key}) : super(key: key);
@@ -48,24 +49,14 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
           isLoading = false;
           error = e.toString();
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al cargar los torneos'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cargar los torneos');
       }
     }
   }
 
   Future<void> _createTournament() async {
     if (_tournamentNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingresa un nombre para el torneo'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Ingresa un nombre para el torneo');
       return;
     }
 
@@ -83,31 +74,16 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
           });
         }
         _tournamentNameController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Torneo creado exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        F1Theme.showSuccess(context, 'Torneo creado exitosamente');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error al crear el torneo'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Error al crear el torneo');
     }
   }
 
   Future<void> _joinTournament() async {
     if (_inviteCodeController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Ingresa un código de invitación'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Ingresa un código de invitación');
       return;
     }
 
@@ -118,28 +94,12 @@ class _TournamentsScreenState extends State<TournamentsScreen> {
       if (response['success'] == true) {
         _fetchTournaments();
         _inviteCodeController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Te has unido al torneo exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        F1Theme.showSuccess(context, 'Te has unido al torneo exitosamente');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Error: ${response['error'] ?? 'No se pudo unir al torneo'}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error: ${response['error'] ?? 'No se pudo unir al torneo'}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error al unirse al torneo'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Error al unirse al torneo');
     }
   }
 

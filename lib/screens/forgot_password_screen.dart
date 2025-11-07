@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/f1_theme.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -33,12 +34,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       if (response['success']) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['message']),
-              backgroundColor: Colors.green,
-            ),
-          );
+          F1Theme.showSuccess(context, response['message']);
           // Navegar a la pantalla de confirmación después de 2 segundos
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
@@ -48,12 +44,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response['error'] ?? 'Error al enviar el correo'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          F1Theme.showError(context, response['error'] ?? 'Error al enviar el correo');
         }
       }
     } finally {

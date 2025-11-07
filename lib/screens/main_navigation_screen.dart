@@ -1601,12 +1601,7 @@ class _ProfileScreenBodyState extends State<_ProfileScreenBody> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cerrar sesión: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cerrar sesión: ${e.toString()}');
       }
     }
   }

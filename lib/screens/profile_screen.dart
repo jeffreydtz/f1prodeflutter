@@ -6,6 +6,7 @@ import '../screens/edit_profile_screen.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/web_navbar.dart';
 import '../widgets/f1_widgets.dart';
+import '../theme/f1_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -21,20 +22,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   bool _error = false;
   int _selectedIndex = 3; // Perfil tab is selected
-
-  // Definir colores por equipo
-  final Map<String, Color> teamColors = {
-    'Mercedes': const Color(0xFF00D2BE),
-    'Red Bull Racing': const Color(0xFF0600EF),
-    'Ferrari': const Color(0xFFDC0000),
-    'McLaren': const Color(0xFFFF8700),
-    'Aston Martin': const Color(0xFF006F62),
-    'Alpine': const Color(0xFF0090FF),
-    'Williams': const Color(0xFF005AFF),
-    'Visa Cash App RB': const Color.fromARGB(255, 106, 143, 185),
-    'Sauber': const Color.fromARGB(255, 1, 232, 74),
-    'Haas F1 Team': const Color(0xFFFFFFFF),
-  };
 
   @override
   void initState() {
@@ -113,7 +100,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Obtener el color del equipo
   Color getTeamColor() {
     final favoriteTeam = userData?['favorite_team'] ?? '';
-    return teamColors[favoriteTeam] ?? const Color.fromARGB(255, 255, 17, 0);
+    return F1Theme.getTeamColor(favoriteTeam);
   }
 
   @override
@@ -189,35 +176,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Color.fromARGB(255, 255, 17, 0),
+      return Center(
+        child: F1LoadingIndicator(
+          message: 'Cargando perfil...',
         ),
       );
     }
 
     if (_error || userData == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.red,
-              size: 60,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Error al cargar el perfil',
-              style: TextStyle(color: Colors.red),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadUserProfile,
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
+      return F1ErrorState(
+        title: 'Error al cargar el perfil',
+        subtitle: 'No se pudo cargar la información del usuario',
+        actionText: 'Reintentar',
+        onAction: _loadUserProfile,
       );
     }
 
@@ -694,12 +665,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _navigateToEditProfile() {
     if (userData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo cargar la información del perfil'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'No se pudo cargar la información del perfil');
       return;
     }
 

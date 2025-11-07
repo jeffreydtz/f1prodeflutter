@@ -5,6 +5,7 @@ import 'dart:typed_data';
 // import '../utils/image_picker_interface.dart';
 // import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../theme/f1_theme.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -210,12 +211,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (mounted) {
         if (success) {
           // Mostrar mensaje de éxito
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Perfil actualizado correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          F1Theme.showSuccess(context, 'Perfil actualizado correctamente');
 
           // Volver a la pantalla anterior
           Navigator.pop(context);
@@ -234,12 +230,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _error = e.toString();
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error: ${e.toString()}');
       }
     }
   }

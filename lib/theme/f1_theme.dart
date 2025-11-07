@@ -613,6 +613,180 @@ class F1Theme {
           spreadRadius: spread * 0.25,
         ),
       ];
+
+  // HELPER METHODS FOR CONSISTENT UI PATTERNS
+
+  /// Show a success SnackBar with consistent F1 styling
+  static void showSuccess(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white),
+            const SizedBox(width: m),
+            Expanded(
+              child: Text(message, style: bodyMedium),
+            ),
+          ],
+        ),
+        backgroundColor: successGreen,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusM),
+        ),
+        margin: const EdgeInsets.all(m),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  /// Show an error SnackBar with consistent F1 styling
+  static void showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_rounded, color: Colors.white),
+            const SizedBox(width: m),
+            Expanded(
+              child: Text(message, style: bodyMedium),
+            ),
+          ],
+        ),
+        backgroundColor: errorRed,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusM),
+        ),
+        margin: const EdgeInsets.all(m),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Show an info SnackBar with consistent F1 styling
+  static void showInfo(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.info_rounded, color: Colors.white),
+            const SizedBox(width: m),
+            Expanded(
+              child: Text(message, style: bodyMedium),
+            ),
+          ],
+        ),
+        backgroundColor: telemetryTeal,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusM),
+        ),
+        margin: const EdgeInsets.all(m),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  /// Show a warning SnackBar with consistent F1 styling
+  static void showWarning(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.warning_rounded, color: Colors.white),
+            const SizedBox(width: m),
+            Expanded(
+              child: Text(message, style: bodyMedium),
+            ),
+          ],
+        ),
+        backgroundColor: warningOrange,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusM),
+        ),
+        margin: const EdgeInsets.all(m),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  /// Create a glassmorphism container with consistent F1 styling
+  static Widget glassContainer({
+    required Widget child,
+    EdgeInsetsGeometry? padding,
+    double blur = 10,
+    double opacity = 0.1,
+    Color? color,
+    BorderRadius? borderRadius,
+    Border? border,
+  }) {
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.circular(radiusL),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(l),
+          decoration: BoxDecoration(
+            color: (color ?? Colors.white).withOpacity(opacity),
+            borderRadius: borderRadius ?? BorderRadius.circular(radiusL),
+            border: border ??
+                Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  /// Standard F1 input decoration for text fields
+  static InputDecoration inputDecoration({
+    required String hint,
+    String? label,
+    IconData? prefixIcon,
+    Widget? suffixIcon,
+    String? error,
+  }) {
+    return InputDecoration(
+      hintText: hint,
+      labelText: label,
+      prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 20) : null,
+      suffixIcon: suffixIcon,
+      errorText: error,
+      hintStyle: bodyMedium.copyWith(color: textGrey),
+      labelStyle: bodyMedium.copyWith(color: textGrey),
+      filled: true,
+      fillColor: mediumGrey,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radiusM),
+        borderSide: const BorderSide(color: borderGrey, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radiusM),
+        borderSide: const BorderSide(color: borderGrey, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radiusM),
+        borderSide: const BorderSide(color: f1Red, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radiusM),
+        borderSide: const BorderSide(color: errorRed, width: 1),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radiusM),
+        borderSide: const BorderSide(color: errorRed, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: m,
+        vertical: m,
+      ),
+    );
+  }
 }
 
 // EXTENSION METHODS
@@ -621,6 +795,23 @@ extension ColorExtension on Color {
   Color get lighten => Color.lerp(this, Colors.white, 0.2) ?? this;
 
   Color withAlpha(int alpha) => Color.fromARGB(alpha, red, green, blue);
+}
+
+extension SpacingExtension on double {
+  /// Create a vertical SizedBox with this height
+  SizedBox get vSpacing => SizedBox(height: this);
+
+  /// Create a horizontal SizedBox with this width
+  SizedBox get hSpacing => SizedBox(width: this);
+
+  /// Create vertical padding
+  EdgeInsets get vPadding => EdgeInsets.symmetric(vertical: this);
+
+  /// Create horizontal padding
+  EdgeInsets get hPadding => EdgeInsets.symmetric(horizontal: this);
+
+  /// Create all-around padding
+  EdgeInsets get allPadding => EdgeInsets.all(this);
 }
 
 extension ContextExtension on BuildContext {

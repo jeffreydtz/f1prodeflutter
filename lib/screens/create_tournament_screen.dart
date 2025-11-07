@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/f1_theme.dart';
 
 class CreateTournamentScreen extends StatefulWidget {
   const CreateTournamentScreen({Key? key}) : super(key: key);
@@ -41,12 +42,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
 
       if (mounted) {
         if (response['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('¡Torneo creado con éxito!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          F1Theme.showSuccess(context, '¡Torneo creado con éxito!');
           Navigator.pushReplacementNamed(context, '/tournaments');
         } else {
           setState(() {

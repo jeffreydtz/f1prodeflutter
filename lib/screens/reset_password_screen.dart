@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/f1_theme.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String uid;
@@ -111,12 +112,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
       if (mounted) {
         if (response['success']) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Contraseña restablecida exitosamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          F1Theme.showSuccess(context, 'Contraseña restablecida exitosamente');
           // Navegar a la pantalla de login después de 2 segundos
           Future.delayed(const Duration(seconds: 2), () {
             if (mounted) {
@@ -125,13 +121,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             }
           });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  response['error'] ?? 'Error al restablecer la contraseña'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          F1Theme.showError(context, response['error'] ?? 'Error al restablecer la contraseña');
         }
       }
     } finally {

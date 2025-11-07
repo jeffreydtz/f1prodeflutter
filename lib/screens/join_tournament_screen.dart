@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../theme/f1_theme.dart';
 
 class JoinTournamentScreen extends StatefulWidget {
   const JoinTournamentScreen({Key? key}) : super(key: key);
@@ -40,12 +41,7 @@ class _JoinTournamentScreenState extends State<JoinTournamentScreen> {
 
       if (mounted) {
         if (response['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('¡Te has unido al torneo exitosamente!'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          F1Theme.showSuccess(context, '¡Te has unido al torneo exitosamente!');
           Navigator.pushReplacementNamed(context, '/tournaments');
         } else {
           setState(() {

@@ -5,6 +5,7 @@ import '../models/betresult.dart';
 import '../models/sanction.dart';
 import '../services/api_service.dart';
 import 'tournament_race_screen.dart';
+import '../theme/f1_theme.dart';
 
 class TournamentDetailsScreen extends StatefulWidget {
   final Tournament tournament;
@@ -73,12 +74,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar la clasificación: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cargar la clasificación: ${e.toString()}');
       }
       setState(() => _isLoadingStandings = false);
     }
@@ -97,12 +93,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar las predicciones: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cargar las predicciones: ${e.toString()}');
       }
       setState(() => _isLoadingBets = false);
     }
@@ -121,12 +112,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al cargar las sanciones: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cargar las sanciones: ${e.toString()}');
       }
       setState(() => _isLoadingSanctions = false);
     }
@@ -137,24 +123,14 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
     if (_usernameController.text.isEmpty ||
         _pointsController.text.isEmpty ||
         _reasonController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Todos los campos son obligatorios'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Todos los campos son obligatorios');
       return;
     }
 
     // Validar que los puntos sean un número válido
     int? points = int.tryParse(_pointsController.text);
     if (points == null || points <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Los puntos deben ser un número positivo'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Los puntos deben ser un número positivo');
       return;
     }
 
@@ -176,27 +152,12 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
         _fetchTournamentSanctions();
         _fetchTournamentStandings();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sanción aplicada correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        F1Theme.showSuccess(context, 'Sanción aplicada correctamente');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al aplicar la sanción: ${result['error']}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al aplicar la sanción: ${result['error']}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al aplicar la sanción: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Error al aplicar la sanción: ${e.toString()}');
     }
   }
 
@@ -212,27 +173,12 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
         _fetchTournamentSanctions();
         _fetchTournamentStandings();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sanción eliminada correctamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        F1Theme.showSuccess(context, 'Sanción eliminada correctamente');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al eliminar la sanción'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al eliminar la sanción');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al eliminar la sanción: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      F1Theme.showError(context, 'Error al eliminar la sanción: ${e.toString()}');
     }
   }
 
@@ -443,12 +389,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
                         Clipboard.setData(ClipboardData(
                             text: _tournamentStandings['invitation_code'] ??
                                 widget.tournament.inviteCode));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Código copiado al portapapeles'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
+                        F1Theme.showSuccess(context, 'Código copiado al portapapeles');
                       },
                     ),
                   ],
@@ -781,7 +722,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
                     labelText: 'Usuario',
                     labelStyle: TextStyle(color: Colors.white70),
                     filled: true,
-                    fillColor: Color(0xFF303030),
+                    fillColor: F1Theme.mediumGrey,
                     border: OutlineInputBorder(),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),
@@ -800,7 +741,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
                     labelText: 'Puntos a descontar',
                     labelStyle: TextStyle(color: Colors.white70),
                     filled: true,
-                    fillColor: Color(0xFF303030),
+                    fillColor: F1Theme.mediumGrey,
                     border: OutlineInputBorder(),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),
@@ -819,7 +760,7 @@ class _TournamentDetailsScreenState extends State<TournamentDetailsScreen>
                     labelText: 'Motivo',
                     labelStyle: TextStyle(color: Colors.white70),
                     filled: true,
-                    fillColor: Color(0xFF303030),
+                    fillColor: F1Theme.mediumGrey,
                     border: OutlineInputBorder(),
                     enabledBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Colors.white24),

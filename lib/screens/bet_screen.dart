@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'results_screen.dart';
+import '../theme/f1_theme.dart';
 
 class BetScreen extends StatefulWidget {
   final String raceName;
@@ -67,12 +68,7 @@ class _BetScreenState extends State<BetScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al cargar los pilotos'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        F1Theme.showError(context, 'Error al cargar los pilotos');
       }
     }
   }

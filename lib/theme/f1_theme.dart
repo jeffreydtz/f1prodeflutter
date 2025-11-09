@@ -4,6 +4,8 @@
 /// Features minimalistic design with emphasis on speed, precision, and modern UI patterns.
 /// Optimized for both mobile and web platforms.
 
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

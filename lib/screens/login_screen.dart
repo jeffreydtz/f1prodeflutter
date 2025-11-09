@@ -126,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               F1TextField(
                                 controller: _usernameController,
                                 hint: 'Username',
-                                prefixIcon: Icons.person_rounded,
+                                prefixIcon: Icon(Icons.person_rounded),
                                 onSubmitted: (_) => _login(),
                               ),
                               F1Theme.m.vSpacing,
@@ -135,7 +135,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               F1TextField(
                                 controller: _passwordController,
                                 hint: 'Password',
-                                prefixIcon: Icons.lock_rounded,
+                                prefixIcon: Icon(Icons.lock_rounded),
                                 obscureText: true,
                                 onSubmitted: (_) => _login(),
                               ),

@@ -150,7 +150,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       F1TextField(
                         controller: _usernameController,
                         hint: 'Username',
-                        prefixIcon: Icons.person_rounded,
+                        prefixIcon: Icon(Icons.person_rounded),
                       ),
                       F1Theme.m.vSpacing,
 
@@ -158,7 +158,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       F1TextField(
                         controller: _emailController,
                         hint: 'Email',
-                        prefixIcon: Icons.email_rounded,
+                        prefixIcon: Icon(Icons.email_rounded),
                         keyboardType: TextInputType.emailAddress,
                       ),
                       F1Theme.m.vSpacing,
@@ -167,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       F1TextField(
                         controller: _passwordController,
                         hint: 'Password (mínimo 8 caracteres)',
-                        prefixIcon: Icons.lock_rounded,
+                        prefixIcon: Icon(Icons.lock_rounded),
                         obscureText: true,
                       ),
                       F1Theme.m.vSpacing,
@@ -176,7 +176,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                       F1TextField(
                         controller: _passwordConfirmController,
                         hint: 'Confirmar Password',
-                        prefixIcon: Icons.lock_outline_rounded,
+                        prefixIcon: Icon(Icons.lock_outline_rounded),
                         obscureText: true,
                       ),
                       F1Theme.l.vSpacing,

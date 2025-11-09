@@ -642,6 +642,7 @@ class F1TextField extends StatelessWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onTap;
+  final ValueChanged<String>? onSubmitted;
   final bool obscureText;
   final TextInputType keyboardType;
   final List<TextInputFormatter>? inputFormatters;
@@ -660,6 +661,7 @@ class F1TextField extends StatelessWidget {
     this.controller,
     this.onChanged,
     this.onTap,
+    this.onSubmitted,
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
     this.inputFormatters,
@@ -691,6 +693,7 @@ class F1TextField extends StatelessWidget {
           controller: controller,
           onChanged: onChanged,
           onTap: onTap,
+          onFieldSubmitted: onSubmitted,
           obscureText: obscureText,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
